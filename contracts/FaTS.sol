@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0;
+pragma solidity >=0.5.0 <0.9.0;
 pragma experimental ABIEncoderV2;
 
-contract FaTS {
-    // The struct for the employees. Contains their title, salary and verification of their salary by the employee.
+contract FaTSu {
+    // The struct for the employees. Contains their title, salary, and verification of their salary by the employee.
     struct Employee {
         string title;
         uint256 salary;
         bool salaryVerified;
     }
 
-    // Maps the different employees to an employment id.
-    mapping(uint256 => Employee) public employees;
-
-    // Maps the employee to an address (digital wallet).
+    // Maps the employee to their address (digital wallet).
+    mapping(address => Employee) public employees;
     mapping(address => uint256) public addressToEmployeeId;
 
     // The employer's address.
@@ -22,100 +20,157 @@ contract FaTS {
     // A way to track how many employees are currently employed.
     uint256 public totalEmployees;
 
-    // A modifier that prevents non-employer users to call specific functions.
+    // Array to store employee addresses
+    address[] public employeeAddresses;
+
+    // Array to store employee details strings
+    string[] public employeeDetailsList;
+
+    // A modifier that prevents non-employer users from calling specific functions.
     modifier onlyEmployer() {
         require(msg.sender == employer, "Only the employer can call this function");
         _;
     }
 
     // Event to log when a new employee is added
-    event EmployeeAdded(uint256 employeeId, string title, uint256 salary);
+    event EmployeeAdded(address employeeAddress, string title, uint256 salary);
 
     // Event to log when an employee's details are updated
-    event EmployeeUpdated(uint256 employeeId, string title, uint256 salary);
+    event EmployeeUpdated(address employeeAddress, string title, uint256 salary);
 
     // Event to log when an employee verifies their salary
-    event SalaryVerified(uint256 employeeId, uint256 salary);
-
-    // Event to log when an employee address is linked to an employee ID
-    event EmployeeAddressLinked(uint256 employeeId, address employeeAddress);
+    event SalaryVerified(address employeeAddress, uint256 salary);
 
     // Constructor to set the employer address
     constructor() {
         employer = msg.sender;
     }
 
+    function getEmployeeAddress(uint256 employeeId) internal view returns (address) {
+        for (uint256 i = 0; i < employeeAddresses.length; i++) {
+            if (addressToEmployeeId[employeeAddresses[i]] == employeeId) {
+                return employeeAddresses[i];
+            }
+        }
+        revert("Employee with the given ID does not exist");
+    }
+
     // Function to add a new employee (only callable by the employer)
-    function addEmployee(uint256 employeeId, string memory title, uint256 salary, address employeeAddress) external onlyEmployer {
-        Employee storage newEmployee = employees[employeeId];
-        require(newEmployee.salary == 0, "Employee with the given ID already exists");
+    function addEmployee(address employeeAddress, string memory title, uint256 salary) external onlyEmployer {
+        Employee storage newEmployee = employees[employeeAddress];
+        require(newEmployee.salary == 0, "Employee with the given address already exists");
 
         newEmployee.title = title;
         newEmployee.salary = salary;
         newEmployee.salaryVerified = false;
-
-        // Link the employee address to the employee ID
-        addressToEmployeeId[employeeAddress] = employeeId;
-
         totalEmployees++;
 
-        emit EmployeeAdded(employeeId, title, salary);
-        emit EmployeeAddressLinked(employeeId, employeeAddress);
+        // Add the employee address to the addressToEmployeeId mapping
+        addressToEmployeeId[employeeAddress] = totalEmployees;
+
+        // Add the employee address to the employeeAddresses array
+        employeeAddresses.push(employeeAddress);
+
+        emit EmployeeAdded(employeeAddress, title, salary);
     }
 
+    // Function to remove an employee (only callable by the employer)
+    function removeEmployee(address employeeAddress) external onlyEmployer {
+    Employee storage existingEmployee = employees[employeeAddress];
+    require(existingEmployee.salary != 0, "Employee with the given address does not exist");
+
+    // Remove the employee's salary details
+    existingEmployee.title = "";
+    existingEmployee.salary = 0;
+    existingEmployee.salaryVerified = false;
+
+    // Unlink the employee address from the addressToEmployeeId mapping
+    addressToEmployeeId[employeeAddress] = 0;
+
+    emit EmployeeUpdated(employeeAddress, "", 0);
+}
+
     // Function to update an employee's details (only callable by the employer)
-    function updateEmployee(uint256 employeeId, string memory title, uint256 salary) external onlyEmployer {
-        Employee storage existingEmployee = employees[employeeId];
-        require(existingEmployee.salary != 0, "Employee with the given ID does not exist");
+    function updateEmployee(address employeeAddress, string memory title, uint256 salary) external onlyEmployer {
+        Employee storage existingEmployee = employees[employeeAddress];
+        require(existingEmployee.salary != 0, "Employee with the given address does not exist");
 
         existingEmployee.title = title;
         existingEmployee.salary = salary;
         // Also resets the verified status of the salary to false since there might be changes.
         existingEmployee.salaryVerified = false;
-        emit EmployeeUpdated(employeeId, title, salary);
+        emit EmployeeUpdated(employeeAddress, title, salary);
     }
 
     // Function for an employee to verify their salary
     function verifySalary() external {
-        // Get the employee ID associated with the caller's address
-        uint256 employeeId = addressToEmployeeId[msg.sender];
-        require(employeeId != 0, "Caller is not linked to any employee ID");
-        Employee storage employee = employees[employeeId];
-        require(employee.salary != 0, "Employee with the given ID does not exist");
+        address employeeAddress = msg.sender;
+        Employee storage employee = employees[employeeAddress];
+        require(employee.salary != 0, "Employee with the given address does not exist");
         require(!employee.salaryVerified, "Salary already verified for this employee");
 
         employee.salaryVerified = true;
 
-        emit SalaryVerified(employeeId, employee.salary);
+        emit SalaryVerified(employeeAddress, employee.salary);
     }
 
-    // Function to get the details of a specific employee
-    function getEmployeeDetails(uint256 employeeId) external view returns (string memory title, uint256 salary, bool salaryVerified) {
-        Employee storage employee = employees[employeeId];
-        require(employee.salary != 0, "Employee with the given ID does not exist");
+    // Function to get all employee details as an array of strings
+    function getAllEmployeeDetails() external view returns (string[] memory) {
+        // Initialize the array to store formatted employee details
+        string[] memory employeeDetailsArray = new string[](totalEmployees);
 
-        return (employee.title, employee.salary, employee.salaryVerified);
-    }
-
-    // Function to get details of all employees
-    function getAllEmployeeDetails() external view returns (string[] memory titles, uint256[] memory salaries, bool[] memory salaryVerified) {
-        // Initialize arrays to store employee details
-        titles = new string[](totalEmployees);
-        salaries = new uint256[](totalEmployees);
-        salaryVerified = new bool[](totalEmployees);
-
-        // Populate the arrays with employee details
-        uint256 currentIndex = 0;
-        for (uint256 i = 1; i <= totalEmployees; i++) {
-            Employee storage employee = employees[i];
+        // Populate the array with employee details
+        for (uint256 i = 0; i < totalEmployees; i++) {
+            address employeeAddress = employeeAddresses[i];
+            Employee storage employee = employees[employeeAddress];
             if (employee.salary != 0) {
-                titles[currentIndex] = employee.title;
-                salaries[currentIndex] = employee.salary;
-                salaryVerified[currentIndex] = employee.salaryVerified;
-                currentIndex++;
+                // Concatenate employee details to the array
+                employeeDetailsArray[i] = string(
+                    abi.encodePacked(
+                        "*NEW LINE* Identifier: ", toString(employeeAddress), ", Title: ", employee.title,
+                        ", Salary: ", uint2str(employee.salary),
+                        ", Verified: ", employee.salaryVerified ? " true " : " false "
+                    )
+                );
             }
         }
 
-        return (titles, salaries, salaryVerified);
+        return employeeDetailsArray;
+    }
+
+    // Helper function to convert uint to string
+    function uint2str(uint256 _i) internal pure returns (string memory str) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 length;
+        while (j != 0) {
+            length++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        j = _i;
+        while (j != 0) {
+            bstr[--k] = bytes1(uint8(48 + j % 10));
+            j /= 10;
+        }
+        str = string(bstr);
+    }
+
+    // Helper function to convert address to string
+    function toString(address _addr) internal pure returns (string memory) {
+        bytes32 value = bytes32(uint256(uint160(_addr)));
+        bytes memory alphabet = "0123456789abcdef";
+
+        bytes memory str = new bytes(42);
+        str[0] = "0";
+        str[1] = "x";
+        for (uint256 i = 0; i < 20; i++) {
+            str[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
+            str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
+        }
+        return string(str);
     }
 }
