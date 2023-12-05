@@ -1,0 +1,63 @@
+.App {
+  text-align: center;
+}
+
+header {
+  height: 100px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 5%;
+  padding-right: 5%;
+}
+
+.left-header {
+  display: flex;
+  align-items: center;
+  gap: 10%;
+}
+
+.right-header {
+  display: flex;
+  align-items: center;
+  gap: 10%;
+  justify-content: flex-end;
+}
+
+
+.header-item {
+  padding: 12px;
+  padding-left: 7%;
+  padding-right: 7%;
+  font-weight: 500;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  transition: 0.3s;
+}
+
+.header-item:hover {
+  background-color: rgb(231, 231, 225);
+  cursor: pointer;
+}
+
+.eth {
+  width: 20px;
+  height: 20px;
+  padding-right: 7%;
+}
+
+.connect-button {
+  font-weight: 500;
+  padding: 12px;
+  border-radius: 20px;
+  background-color: rgb(231, 231, 225);
+  color: #5981F3;
+
+}
+
+.connect-button:hover {
+  cursor: pointer;
+  background-color: none;
+  color:#3b4874
+}
