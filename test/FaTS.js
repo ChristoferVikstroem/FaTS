@@ -1,14 +1,15 @@
 const { expect } = require("chai");
 const hre = require("hardhat");
 
-/* sample helloworld test with chai.
-run all tests in ./test with `npx hardhat test`
+/* run all tests in ./test with `npx hardhat test` or `hh test`
 refer to chai assertions manual. */
 
-
-describe("HelloWorld", function () {
-  it("Should log Hello World!", async function () {
-    const fats = await ethers.deployContract("FaTS");
-    await expect(await fats.helloWorld()).to.equal("Hello World!");
+describe('FaTS', function () {
+  describe('Deployment', function () {
+    it('should set owner as employer', async function () {
+      const [owner] = await ethers.getSigners();
+      const fats = await ethers.deployContract("FaTS");
+      expect(await fats.getEmployer()).to.equal(owner.address);
+    });
   });
-})
+});

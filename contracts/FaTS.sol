@@ -24,7 +24,10 @@ contract FaTS {
 
     // A modifier that prevents non-employer users to call specific functions.
     modifier onlyEmployer() {
-        require(msg.sender == employer, "Only the employer can call this function");
+        require(
+            msg.sender == employer,
+            "Only the employer can call this function"
+        );
         _;
     }
 
@@ -46,9 +49,17 @@ contract FaTS {
     }
 
     // Function to add a new employee (only callable by the employer)
-    function addEmployee(uint256 employeeId, string memory title, uint256 salary, address employeeAddress) external onlyEmployer {
+    function addEmployee(
+        uint256 employeeId,
+        string memory title,
+        uint256 salary,
+        address employeeAddress
+    ) external onlyEmployer {
         Employee storage newEmployee = employees[employeeId];
-        require(newEmployee.salary == 0, "Employee with the given ID already exists");
+        require(
+            newEmployee.salary == 0,
+            "Employee with the given ID already exists"
+        );
 
         newEmployee.title = title;
         newEmployee.salary = salary;
@@ -63,10 +74,21 @@ contract FaTS {
         emit EmployeeAddressLinked(employeeId, employeeAddress);
     }
 
+    function getEmployer() external view returns (address) {
+        return employer;
+    }
+
     // Function to update an employee's details (only callable by the employer)
-    function updateEmployee(uint256 employeeId, string memory title, uint256 salary) external onlyEmployer {
+    function updateEmployee(
+        uint256 employeeId,
+        string memory title,
+        uint256 salary
+    ) external onlyEmployer {
         Employee storage existingEmployee = employees[employeeId];
-        require(existingEmployee.salary != 0, "Employee with the given ID does not exist");
+        require(
+            existingEmployee.salary != 0,
+            "Employee with the given ID does not exist"
+        );
 
         existingEmployee.title = title;
         existingEmployee.salary = salary;
@@ -81,8 +103,14 @@ contract FaTS {
         uint256 employeeId = addressToEmployeeId[msg.sender];
         require(employeeId != 0, "Caller is not linked to any employee ID");
         Employee storage employee = employees[employeeId];
-        require(employee.salary != 0, "Employee with the given ID does not exist");
-        require(!employee.salaryVerified, "Salary already verified for this employee");
+        require(
+            employee.salary != 0,
+            "Employee with the given ID does not exist"
+        );
+        require(
+            !employee.salaryVerified,
+            "Salary already verified for this employee"
+        );
 
         employee.salaryVerified = true;
 
@@ -90,15 +118,32 @@ contract FaTS {
     }
 
     // Function to get the details of a specific employee
-    function getEmployeeDetails(uint256 employeeId) external view returns (string memory title, uint256 salary, bool salaryVerified) {
+    function getEmployeeDetails(
+        uint256 employeeId
+    )
+        external
+        view
+        returns (string memory title, uint256 salary, bool salaryVerified)
+    {
         Employee storage employee = employees[employeeId];
-        require(employee.salary != 0, "Employee with the given ID does not exist");
+        require(
+            employee.salary != 0,
+            "Employee with the given ID does not exist"
+        );
 
         return (employee.title, employee.salary, employee.salaryVerified);
     }
 
     // Function to get details of all employees
-    function getAllEmployeeDetails() external view returns (string[] memory titles, uint256[] memory salaries, bool[] memory salaryVerified) {
+    function getAllEmployeeDetails()
+        external
+        view
+        returns (
+            string[] memory titles,
+            uint256[] memory salaries,
+            bool[] memory salaryVerified
+        )
+    {
         // Initialize arrays to store employee details
         titles = new string[](totalEmployees);
         salaries = new uint256[](totalEmployees);
