@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.5.0 <0.9.0;
 pragma experimental ABIEncoderV2;
@@ -10,20 +9,30 @@ contract CompanyFactory {
     // Event to log when a new company is added to a sector
     event CompanyAddedToSector(string sector, address companyAddress);
 
-    // Function to create a new company contract and add it to a specific sector
+// Function to create a new company contract and add it to a specific sector
     function createCompany(
         string memory sector,
         string memory title,
         uint256 salary
-    ) public {
-        companyContract newCompany = new companyContract();
-        newCompany.addEmployee(msg.sender, title, salary);
+    ) public returns (address) {
+        // Create a new company contract with the caller as the employer
+        companyContract newCompany = new companyContract(msg.sender);
 
+        // Add the new company to the sector
         companiesBySector[sector].push(newCompany);
 
-        emit CompanyAddedToSector(sector, address(newCompany));
-    }
+        // Get the address of the new company contract
+        address newCompanyAddress = address(newCompany);
 
+        // Emit the event with the address of the new company
+        emit CompanyAddedToSector(sector, newCompanyAddress);
+
+        // Call the addEmployee function in the new company contract
+        newCompany.addEmployee(msg.sender, title, salary);
+
+        // Return the address of the newly created company contract
+        return newCompanyAddress;
+    }
     // Function to get the total number of companies in a sector
     function getCompanyCountInSector(string memory sector) public view returns (uint256) {
         return companiesBySector[sector].length;
@@ -31,22 +40,43 @@ contract CompanyFactory {
 
     // Function to get the details of a company in a specific sector by index
     function getCompanyDetailsInSector(string memory sector, uint256 index)
-        public
-        view
-        returns (
-            address employer,
-            uint256 totalEmployees,
-            address[] memory employeeAddresses
-        )
-    {
-        require(index < companiesBySector[sector].length, "Index out of bounds");
+    public
+    view
+    returns (
+        address employer,
+        uint256 totalEmployees,
+        address[] memory employeeAddresses,
+        uint256 averageSalary
+    )
+{
+    require(index < companiesBySector[sector].length, "Index out of bounds");
 
-        companyContract company = companiesBySector[sector][index];
-        address companyAddress = address(company);
+    companyContract company = companiesBySector[sector][index];
+    address companyAddress = address(company);
 
-        employeeAddresses = company.getEmployeeAddresses(companyAddress); // Pass the company address as an argument
+    employeeAddresses = company.getEmployeeAddresses();
+    totalEmployees = company.totalEmployees();
+    averageSalary = company.getAverageSalary();
 
-        return (companyAddress, company.totalEmployees(), employeeAddresses);
+    return (companyAddress, totalEmployees, employeeAddresses, averageSalary);
+}
+
+    // Function to get the average salary of employees in a sector
+    function getAverageSalaryInSector(string memory sector) public view returns (uint256) {
+        uint256 totalSalaries;
+        uint256 totalEmployees;
+
+        for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
+            companyContract company = companiesBySector[sector][i];
+            totalSalaries += company.getAverageSalary();
+            totalEmployees += company.totalEmployees();
+        }
+
+        if (totalEmployees > 0) {
+            return totalSalaries / totalEmployees;
+        } else {
+            return 0;
+        }
     }
 }
 
@@ -72,9 +102,8 @@ contract companyContract {
     address[] public employeeAddresses;
 
     // A modifier that prevents non-employer users from calling specific functions.
-    modifier onlyEmployer() {
-        require(msg.sender == employer, "Only the employer can call this function");
-        _;
+     constructor(address _employer) {
+        employer = _employer;
     }
 
     // Event to log when a new employee is added
@@ -87,12 +116,13 @@ contract companyContract {
     event SalaryVerified(address employeeAddress, uint256 salary);
 
     // Constructor to set the employer address
-    constructor() {
-        employer = msg.sender;
+      modifier onlyEmployer() {
+        require(msg.sender == employer, "Only the employer can call this function");
+        _;
     }
 
     // Function to add a new employee (only callable by the employer)
-    function addEmployee(address employeeAddress, string memory title, uint256 salary) external onlyEmployer {
+      function addEmployee(address employeeAddress, string memory title, uint256 salary) external {
         Employee storage newEmployee = employees[employeeAddress];
         require(newEmployee.salary == 0, "Employee with the given address already exists");
 
@@ -108,6 +138,22 @@ contract companyContract {
         employeeAddresses.push(employeeAddress);
 
         emit EmployeeAdded(employeeAddress, title, salary);
+    }
+
+    // Function to get the average salary of employees in the company
+    function getAverageSalary() external view returns (uint256) {
+        uint256 totalSalary;
+
+        for (uint256 i = 0; i < employeeAddresses.length; i++) {
+            address employeeAddress = employeeAddresses[i];
+            totalSalary += employees[employeeAddress].salary;
+        }
+
+        if (totalEmployees > 0) {
+            return totalSalary / totalEmployees;
+        } else {
+            return 0;
+        }
     }
 
     // Function to remove an employee (only callable by the employer)
@@ -151,7 +197,7 @@ contract companyContract {
     }
 
     // Function to get the employee addresses
-  function getEmployeeAddresses(address) public view returns (address[] memory) {
-      return employeeAddresses;
-  }
+    function getEmployeeAddresses() public view returns (address[] memory) {
+        return employeeAddresses;
+    }
 }
