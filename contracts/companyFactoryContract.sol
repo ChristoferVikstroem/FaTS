@@ -1,8 +1,56 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.5.0 <0.9.0;
 pragma experimental ABIEncoderV2;
 
-contract FaTSu {
+contract CompanyFactory {
+    // Mapping to store companies by sector
+    mapping(string => companyContract[]) public companiesBySector;
+
+    // Event to log when a new company is added to a sector
+    event CompanyAddedToSector(string sector, address companyAddress);
+
+    // Function to create a new company contract and add it to a specific sector
+    function createCompany(
+        string memory sector,
+        string memory title,
+        uint256 salary
+    ) public {
+        companyContract newCompany = new companyContract();
+        newCompany.addEmployee(msg.sender, title, salary);
+
+        companiesBySector[sector].push(newCompany);
+
+        emit CompanyAddedToSector(sector, address(newCompany));
+    }
+
+    // Function to get the total number of companies in a sector
+    function getCompanyCountInSector(string memory sector) public view returns (uint256) {
+        return companiesBySector[sector].length;
+    }
+
+    // Function to get the details of a company in a specific sector by index
+    function getCompanyDetailsInSector(string memory sector, uint256 index)
+        public
+        view
+        returns (
+            address employer,
+            uint256 totalEmployees,
+            address[] memory employeeAddresses
+        )
+    {
+        require(index < companiesBySector[sector].length, "Index out of bounds");
+
+        companyContract company = companiesBySector[sector][index];
+        address companyAddress = address(company);
+
+        employeeAddresses = company.getEmployeeAddresses(companyAddress); // Pass the company address as an argument
+
+        return (companyAddress, company.totalEmployees(), employeeAddresses);
+    }
+}
+
+contract companyContract {
     // The struct for the employees. Contains their title, salary, and verification of their salary by the employee.
     struct Employee {
         string title;
@@ -23,9 +71,6 @@ contract FaTSu {
     // Array to store employee addresses
     address[] public employeeAddresses;
 
-    // Array to store employee details strings
-    string[] public employeeDetailsList;
-
     // A modifier that prevents non-employer users from calling specific functions.
     modifier onlyEmployer() {
         require(msg.sender == employer, "Only the employer can call this function");
@@ -44,15 +89,6 @@ contract FaTSu {
     // Constructor to set the employer address
     constructor() {
         employer = msg.sender;
-    }
-
-    function getEmployeeAddress(uint256 employeeId) internal view returns (address) {
-        for (uint256 i = 0; i < employeeAddresses.length; i++) {
-            if (addressToEmployeeId[employeeAddresses[i]] == employeeId) {
-                return employeeAddresses[i];
-            }
-        }
-        revert("Employee with the given ID does not exist");
     }
 
     // Function to add a new employee (only callable by the employer)
@@ -76,19 +112,19 @@ contract FaTSu {
 
     // Function to remove an employee (only callable by the employer)
     function removeEmployee(address employeeAddress) external onlyEmployer {
-    Employee storage existingEmployee = employees[employeeAddress];
-    require(existingEmployee.salary != 0, "Employee with the given address does not exist");
+        Employee storage existingEmployee = employees[employeeAddress];
+        require(existingEmployee.salary != 0, "Employee with the given address does not exist");
 
-    // Remove the employee's salary details
-    existingEmployee.title = "";
-    existingEmployee.salary = 0;
-    existingEmployee.salaryVerified = false;
+        // Remove the employee's salary details
+        existingEmployee.title = "";
+        existingEmployee.salary = 0;
+        existingEmployee.salaryVerified = false;
 
-    // Unlink the employee address from the addressToEmployeeId mapping
-    addressToEmployeeId[employeeAddress] = 0;
+        // Unlink the employee address from the addressToEmployeeId mapping
+        addressToEmployeeId[employeeAddress] = 0;
 
-    emit EmployeeUpdated(employeeAddress, "", 0);
-}
+        emit EmployeeUpdated(employeeAddress, "", 0);
+    }
 
     // Function to update an employee's details (only callable by the employer)
     function updateEmployee(address employeeAddress, string memory title, uint256 salary) external onlyEmployer {
@@ -114,63 +150,8 @@ contract FaTSu {
         emit SalaryVerified(employeeAddress, employee.salary);
     }
 
-    // Function to get all employee details as an array of strings
-    function getAllEmployeeDetails() external view returns (string[] memory) {
-        // Initialize the array to store formatted employee details
-        string[] memory employeeDetailsArray = new string[](totalEmployees);
-
-        // Populate the array with employee details
-        for (uint256 i = 0; i < totalEmployees; i++) {
-            address employeeAddress = employeeAddresses[i];
-            Employee storage employee = employees[employeeAddress];
-            if (employee.salary != 0) {
-                // Concatenate employee details to the array
-                employeeDetailsArray[i] = string(
-                    abi.encodePacked(
-                        "*NEW LINE* Identifier: ", toString(employeeAddress), ", Title: ", employee.title,
-                        ", Salary: ", uint2str(employee.salary),
-                        ", Verified: ", employee.salaryVerified ? " true " : " false "
-                    )
-                );
-            }
-        }
-
-        return employeeDetailsArray;
-    }
-
-    // Helper function to convert uint to string
-    function uint2str(uint256 _i) internal pure returns (string memory str) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint256 j = _i;
-        uint256 length;
-        while (j != 0) {
-            length++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(length);
-        uint256 k = length;
-        j = _i;
-        while (j != 0) {
-            bstr[--k] = bytes1(uint8(48 + j % 10));
-            j /= 10;
-        }
-        str = string(bstr);
-    }
-
-    // Helper function to convert address to string
-    function toString(address _addr) internal pure returns (string memory) {
-        bytes32 value = bytes32(uint256(uint160(_addr)));
-        bytes memory alphabet = "0123456789abcdef";
-
-        bytes memory str = new bytes(42);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint256 i = 0; i < 20; i++) {
-            str[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
-            str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
-        }
-        return string(str);
-    }
+    // Function to get the employee addresses
+  function getEmployeeAddresses(address) public view returns (address[] memory) {
+      return employeeAddresses;
+  }
 }
