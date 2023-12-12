@@ -52,7 +52,7 @@ contract CompanyFactory {
         isRegistered[companyAdmin] = true;
 
         // create Company instance
-        Company company = new Company(companyAdmin); // todo, more params!
+        Company company = new Company(companyAdmin, sector); // todo, more params!
         company.addEmployee(msg.sender, adminTitle, adminSalary);
         companies[companyAdmin] = company;
         companiesBySector[sector].push(companyAdmin);
