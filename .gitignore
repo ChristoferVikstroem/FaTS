@@ -1,6 +1,7 @@
 node_modules
 .env
 
+/contracts/vivi*
 # Hardhat files
 /cache
 /artifacts
