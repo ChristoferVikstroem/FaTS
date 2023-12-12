@@ -4,12 +4,12 @@ pragma experimental ABIEncoderV2;
 
 contract CompanyFactory {
     // Mapping to store companies by sector
-    mapping(string => companyContract[]) public companiesBySector;
-
+    mapping(string => address[]) public companiesBySector;
+    string[] public sectors;
     // Event to log when a new company is added to a sector
     event CompanyAddedToSector(string sector, address companyAddress);
 
-// Function to create a new company contract and add it to a specific sector
+    // Function to create a new company contract and add it to a specific sector
     function createCompany(
         string memory sector,
         string memory title,
@@ -19,7 +19,21 @@ contract CompanyFactory {
         companyContract newCompany = new companyContract(msg.sender);
 
         // Add the new company to the sector
-        companiesBySector[sector].push(newCompany);
+        companiesBySector[sector].push(address(newCompany));
+
+        // Check if the sector already exists in the sectors array
+        bool sectorExists = false;
+        for (uint256 i = 0; i < sectors.length; i++) {
+            if (keccak256(bytes(sectors[i])) == keccak256(bytes(sector))) {
+                sectorExists = true;
+                break;
+            }
+        }
+
+        // If the sector does not exist, add it to the sectors array
+        if (!sectorExists) {
+            sectors.push(sector);
+        }
 
         // Get the address of the new company contract
         address newCompanyAddress = address(newCompany);
@@ -33,33 +47,35 @@ contract CompanyFactory {
         // Return the address of the newly created company contract
         return newCompanyAddress;
     }
-    // Function to get the total number of companies in a sector
-    function getCompanyCountInSector(string memory sector) public view returns (uint256) {
-        return companiesBySector[sector].length;
+
+    function getCompanyDetails(address companyAddress)
+        public
+        view
+        returns (
+            string memory sector,
+            uint256 totalEmployees,
+            uint256 averageSalary
+        )
+    {
+        for (uint256 i = 0; i < sectors.length; i++) {
+            address[] storage companies = companiesBySector[sectors[i]];
+            for (uint256 j = 0; j < companies.length; j++) {
+                address currentCompany = companies[j];
+                if (currentCompany == companyAddress) {
+                    sector = sectors[i];
+                    companyContract company = companyContract(currentCompany);
+                    totalEmployees = company.totalEmployees();
+                    averageSalary = company.getAverageSalary();
+                    return (sector, totalEmployees, averageSalary);
+                }
+            }
+        }
+
+        // Return default values if company is not found
+        return (sector, totalEmployees, averageSalary);
     }
 
-    // Function to get the details of a company in a specific sector by index
-    function getCompanyDetailsInSector(string memory sector, uint256 index)
-    public
-    view
-    returns (
-        address employer,
-        uint256 totalEmployees,
-        address[] memory employeeAddresses,
-        uint256 averageSalary
-    )
-{
-    require(index < companiesBySector[sector].length, "Index out of bounds");
 
-    companyContract company = companiesBySector[sector][index];
-    address companyAddress = address(company);
-
-    employeeAddresses = company.getEmployeeAddresses();
-    totalEmployees = company.totalEmployees();
-    averageSalary = company.getAverageSalary();
-
-    return (companyAddress, totalEmployees, employeeAddresses, averageSalary);
-}
 
     // Function to get the average salary of employees in a sector
     function getAverageSalaryInSector(string memory sector) public view returns (uint256) {
@@ -67,8 +83,8 @@ contract CompanyFactory {
         uint256 totalEmployees;
 
         for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
-            companyContract company = companiesBySector[sector][i];
-            totalSalaries += company.getAverageSalary();
+            companyContract company = companyContract(companiesBySector[sector][i]);
+            totalSalaries += company.getAverageSalary() * company.totalEmployees();
             totalEmployees += company.totalEmployees();
         }
 
@@ -78,6 +94,18 @@ contract CompanyFactory {
             return 0;
         }
     }
+
+    // Function to get the addresses of companies in a sector
+    function getCompanyAddressesInSector(string memory sector) public view returns (address[] memory) {
+    address[] storage companyAddresses = companiesBySector[sector];
+    address[] memory addresses = new address[](companyAddresses.length);
+
+    for (uint256 i = 0; i < companyAddresses.length; i++) {
+        addresses[i] = companyAddresses[i];
+    }
+
+    return addresses;
+}
 }
 
 contract companyContract {
@@ -90,7 +118,7 @@ contract companyContract {
 
     // Maps the employee to their address (digital wallet).
     mapping(address => Employee) public employees;
-    mapping(address => uint256) public addressToEmployeeId;
+    mapping(address => uint256) public addressToEmployeeId; //Perhaps not neccessary
 
     // The employer's address.
     address public employer;
@@ -102,7 +130,7 @@ contract companyContract {
     address[] public employeeAddresses;
 
     // A modifier that prevents non-employer users from calling specific functions.
-     constructor(address _employer) {
+    constructor(address _employer) {
         employer = _employer;
     }
 
@@ -116,13 +144,13 @@ contract companyContract {
     event SalaryVerified(address employeeAddress, uint256 salary);
 
     // Constructor to set the employer address
-      modifier onlyEmployer() {
+    modifier onlyEmployer() {
         require(msg.sender == employer, "Only the employer can call this function");
         _;
     }
 
     // Function to add a new employee (only callable by the employer)
-      function addEmployee(address employeeAddress, string memory title, uint256 salary) external {
+    function addEmployee(address employeeAddress, string memory title, uint256 salary) external {
         Employee storage newEmployee = employees[employeeAddress];
         require(newEmployee.salary == 0, "Employee with the given address already exists");
 
