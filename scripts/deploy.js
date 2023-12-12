@@ -12,10 +12,11 @@ const hre = require("hardhat"); // can also run scripts via node <script>
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  hre.ethers.getContractFactory
-  const fats = await hre.ethers.deployContract("FaTS");
-  await fats.waitForDeployment();
-  console.log(`FaTS deployed to ${fats.target} from account: ${deployer.address}`);
+  const company = await hre.ethers.deployContract("Company");
+  await company.waitForDeployment();
+  const companyFactory = await hre.ethers.deployContract("CompanyFactory");
+  await companyFactory.waitForDeployment();
+  console.log(`Company deployed to ${company.target} and Factory deployed to ${companyFactory.target} from account: ${deployer.address}`);
 }
 
 // pattern to use async/await everywhere and properly handle errors.
