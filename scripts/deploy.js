@@ -12,6 +12,7 @@ const hre = require("hardhat"); // can also run scripts via node <script>
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  hre.ethers.getContractFactory
   const fats = await hre.ethers.deployContract("FaTS");
   await fats.waitForDeployment();
   console.log(`FaTS deployed to ${fats.target} from account: ${deployer.address}`);
