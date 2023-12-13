@@ -3,16 +3,17 @@ pragma solidity >=0.5.0 <0.9.0;
 import "./Company.sol";
 
 // todo fix sized arrays.
+// todo
 
 contract CompanyFactory {
     // variables and mappings
     address _owner;
-    string[] public sectors; // todo
+    string[] public sectors; // todo add/remove functionality or not
     mapping(string => bool) public isSector; // todo change to sectors
     mapping(address => bool) public isRegistered;
     mapping(address => Company) public companies; // indexed by company id, id created when creating companu
     mapping(string => address[]) public companiesBySector; // maps a sector string to ids of companies in this sector.
-    mapping(string => address[]) public companiesBySize; // for example.. small, medium, large
+    //mapping(string => address[]) public companiesBySize; // for example.. small, medium, large
 
     // events and modifiers
     event CompanyAdded(address companyAddress, string sector); // todo add more interestig parameters
@@ -32,7 +33,6 @@ contract CompanyFactory {
     // company registration and deletion
 
     function createCompany(
-        // todo, it makes sense to supply _company_ data, not ceo data.
         string memory sector,
         string memory adminTitle,
         uint256 adminSalary
@@ -48,27 +48,28 @@ contract CompanyFactory {
             "Company admin's title and salary must be submitted."
         );
         require(isSector[sector], "Company is not a valid sector.");
-
         isRegistered[companyAdmin] = true;
 
         // create Company instance
-        Company company = new Company(companyAdmin, sector); // todo, more params!
-        company.addEmployee(msg.sender, adminTitle, adminSalary);
+        Company company = new Company(companyAdmin, sector); // ¿todo, más parametros? Soy le hombre de plastico, joder.
         companies[companyAdmin] = company;
         companiesBySector[sector].push(companyAdmin);
+        company.addEmployee(msg.sender, adminTitle, adminSalary);
         emit CompanyAdded(address(company), sector);
     }
 
-    function removeCompany() public {
+    function removeCompany(address companyAddress) public {
         address companyAdmin = msg.sender;
         require(
             isRegistered[companyAdmin],
             "No company registered under this address."
         );
-        isRegistered[companyAdmin] = false;
+        require(
+            companyAdmin == companies[companyAddress].employer(),
+            "You are not an admin at this company."
+        );
 
-        // handle
-        // todo lookup use of memory/storage/calldata.
+        isRegistered[companyAdmin] = false;
         string memory companySector = companies[companyAdmin].sector();
         address[] memory companiesInSector = companiesBySector[companySector];
         // todo, might need to lock while removing.
@@ -114,6 +115,7 @@ contract CompanyFactory {
     function getAverageSalaryInSector(
         string memory sector
     ) public view returns (uint256) {
+        require(isSector[sector], "Not a valid sector.");
         uint256 totalSalaries;
         uint256 totalEmployees;
 
@@ -136,13 +138,7 @@ contract CompanyFactory {
     function getCompanyAddressesInSector(
         string memory sector
     ) public view returns (address[] memory) {
-        address[] storage companyAddresses = companiesBySector[sector];
-        // todo: why not just return companiesBySector[sector]; ?
-        address[] memory addresses = new address[](companyAddresses.length);
-
-        for (uint256 i = 0; i < companyAddresses.length; i++) {
-            addresses[i] = companyAddresses[i];
-        }
-        return addresses;
+        require(isSector[sector], "Not a valid sector.");
+        return companiesBySector[sector];
     }
 }

@@ -7,6 +7,9 @@ pragma solidity >=0.5.0 <0.9.0;
  * storage is used to store data permanently on the blockchain.
  */
 
+// todo: more personal view?
+// todo snapshot function
+
 contract Company {
     // company details
     address public employer; // todo decide on name: employer or companyAdmin, use same in both contracts.
@@ -14,9 +17,9 @@ contract Company {
     uint256 public totalEmployees;
     uint256 private totalSalaries;
 
-    address[] public employeeAddresses; // todo: remove? we have this info in the mapping
-    mapping(address => Employee) public employees;
-    mapping(address => bool) private isEmployee;
+    //address[] public employeeAddresses; // todo: remove? we have this info in the mapping
+    mapping(address => Employee) public employees; // {address1: Employee object, address2: e}
+    mapping(address => bool) public isEmployee; // todo better way to do this?
 
     struct Employee {
         string title;
@@ -24,13 +27,13 @@ contract Company {
         bool salaryVerified;
     }
 
+    // todo, make into one event?
     event EmployeeAdded(address employeeAddress, string title, uint256 salary);
     event EmployeeRemoved(
         address employeeAddress,
         string title,
         uint256 salary
     );
-    event SalaryVerified(address employeeAddress, uint256 salary);
     event EmployeeUpdated(
         address employeeAddress,
         string oldTitle,
@@ -38,10 +41,10 @@ contract Company {
         uint256 oldSalary,
         uint256 newSalary
     );
+    event SalaryVerified(address employeeAddress, uint256 salary);
 
-    // Constructor to set the employer address
     modifier onlyEmployer() {
-        // todo: add functionality to add/remove employers/admins?
+        // todo: add functionality to add/remove employers/admins? and access control
         require(
             msg.sender == employer,
             "You are not an admin of this company."
@@ -49,8 +52,8 @@ contract Company {
         _;
     }
 
-    // A modifier that prevents non-employer users from calling specific functions.
     constructor(address _employer, string memory _sector) {
+        // todo any additional data we want to give a company?
         employer = _employer;
         sector = _sector;
     }
@@ -73,12 +76,11 @@ contract Company {
             salary: _salary,
             salaryVerified: false
         });
-        totalSalaries += _salary;
-        totalEmployees++;
+        totalSalaries += _salary; // todo change?
+        totalEmployees++; // change - this is the "length" of the mapping
         emit EmployeeAdded(employeeAddress, _title, _salary);
     }
 
-    // remove an employee (only callable by employer)
     function removeEmployee(address employeeAddress) external onlyEmployer {
         require(
             isEmployee[employeeAddress],
@@ -89,14 +91,13 @@ contract Company {
         Employee memory employee = employees[employeeAddress];
         string memory title = employee.title;
         uint256 salary = employee.salary;
-        totalSalaries -= salary;
+        totalSalaries -= salary; // todo discuss if we should remove
         totalEmployees--;
         // remove employee
         delete employees[employeeAddress]; // test this
         emit EmployeeRemoved(employeeAddress, title, salary);
     }
 
-    // update an employee's details (only callable by employer)
     function updateEmployee(
         address employeeAddress,
         string memory newTitle,
@@ -114,7 +115,9 @@ contract Company {
         employee.salaryVerified = false;
         employee.salary = newSalary;
         employee.title = newTitle;
-        totalSalaries += (newSalary - oldSalary);
+        // todo use safemath
+        totalSalaries -= oldSalary;
+        totalSalaries += newSalary;
         emit EmployeeUpdated(
             employeeAddress,
             oldTitle,
@@ -127,6 +130,7 @@ contract Company {
     // get the average salary of employees in the company
     // todo: functionality that should be moved off-chain?
     function getAverageSalary() external view returns (uint256) {
+        // todo maybe have back for loop
         if (totalEmployees > 0) {
             return totalSalaries / totalEmployees;
         } else {
