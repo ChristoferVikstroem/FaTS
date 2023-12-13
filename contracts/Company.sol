@@ -17,7 +17,6 @@ contract Company {
     address[] public employeeAddresses; // todo: remove? we have this info in the mapping
     mapping(address => Employee) public employees;
     mapping(address => bool) private isEmployee;
-    mapping(address => uint256) public addressToEmployeeId; // perhaps not neccessary / christofer
 
     struct Employee {
         string title;
@@ -53,7 +52,6 @@ contract Company {
     // A modifier that prevents non-employer users from calling specific functions.
     constructor(address _employer, string memory _sector) {
         employer = _employer;
-        totalEmployees = 1;
         sector = _sector;
     }
 
@@ -117,7 +115,13 @@ contract Company {
         employee.salary = newSalary;
         employee.title = newTitle;
         totalSalaries += (newSalary - oldSalary);
-        emit EmployeeUpdated(employeeAddress, oldTitle, newTitle, oldSalary, newSalary);
+        emit EmployeeUpdated(
+            employeeAddress,
+            oldTitle,
+            newTitle,
+            oldSalary,
+            newSalary
+        );
     }
 
     // get the average salary of employees in the company
@@ -133,9 +137,15 @@ contract Company {
     // Function for an employee to verify their salary
     function verifySalary() external {
         address employeeAddress = msg.sender;
-        require(isEmployee[employeeAddress], "Address not registered as employee.");
+        require(
+            isEmployee[employeeAddress],
+            "Address not registered as employee."
+        );
         Employee storage employee = employees[employeeAddress];
-        require(!employee.salaryVerified, "Salary already verified for this employee.");
+        require(
+            !employee.salaryVerified,
+            "Salary already verified for this employee."
+        );
         employee.salaryVerified = true;
         emit SalaryVerified(employeeAddress, employee.salary);
     }
