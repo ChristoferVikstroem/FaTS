@@ -31,7 +31,7 @@ describe('Company', function () {
     })
   });
 
-  describe('Processing employees', function () {
+  describe('Admin processing of employees', function () {
 
     it('should add an employee details correctly', async function () {
       const { company, account1 } = await loadFixture(defaultFixture);
@@ -74,13 +74,19 @@ describe('Company', function () {
       await expect(company.connect(account1).removeEmployee(account2.address)).to.be.revertedWith('You are not an admin of this company.');
       await expect(company.connect(account1).updateEmployee(account2.address, "Improper Technician", 42000)).to.be.revertedWith('You are not an admin of this company.');
     });
-  })
+  });
 
   describe('Company metadata', function () {
     it('should display correct average salary', async function () {
-
       // todo
 
     });
-  })
+  });
+
+  describe('Individual employee interaction', function () {
+    it('should allow an employee to verify their salary', async function () {
+      // todo
+    });
+  });
+
 });
