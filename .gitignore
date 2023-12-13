@@ -1,6 +1,7 @@
 node_modules
 .env
 
+/contracts/vivi*
 # Hardhat files
 /cache
 /artifacts
@@ -12,3 +13,6 @@ node_modules
 # solidity-coverage files
 /coverage
 /coverage.json
+
+# secrets
+/keys.js
