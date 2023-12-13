@@ -172,5 +172,4 @@ contract FaTSu {
             str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
         }
         return string(str);
-    }
-}
+
