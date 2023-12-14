@@ -7,7 +7,7 @@ import "./Company.sol";
 
 contract CompanyFactory {
     // variables and mappings
-    address _owner;
+    address public owner;
     string[] public sectors; // todo add/remove functionality or not
     mapping(string => bool) public isSector; // todo change to sectors
     mapping(address => bool) public isRegistered;
@@ -16,46 +16,46 @@ contract CompanyFactory {
     //mapping(string => address[]) public companiesBySize; // for example.. small, medium, large
 
     // events and modifiers
-    event CompanyAdded(address companyAddress, string sector); // todo add more interestig parameters
+    event CompanyAdded(
+        address companyAdmin,
+        address contractAddress,
+        string sector
+    ); // todo add more interestig parameters
     event SectorAdded(string sector);
     event SectorRemoved(string sector);
     // todo any other relevant events
 
     modifier onlyOwner() {
-        require(msg.sender == _owner, "Not owner.");
+        require(msg.sender == owner, "Not owner.");
         _;
     }
 
     constructor() {
-        _owner = msg.sender;
+        owner = msg.sender;
+        isSector["IT"] = true;
     }
 
     // company registration and deletion
 
-    function createCompany(
-        string memory sector,
-        string memory adminTitle,
-        uint256 adminSalary
-    ) public {
+    function createCompany(string memory sector) public {
         // conditions
         address companyAdmin = msg.sender;
         require(
             !isRegistered[companyAdmin],
             "Company already registered for this address."
         );
-        require(
+        /*require(
             bytes(adminTitle).length > 0 && (adminSalary > 0),
-            "Company admin's title and salary must be submitted."
-        );
-        require(isSector[sector], "Company is not a valid sector.");
+            "Company admin's title and salary must be submitted.");
+        */
+        require(isSector[sector], "Sector provided is not valid.");
         isRegistered[companyAdmin] = true;
 
         // create Company instance
         Company company = new Company(companyAdmin, sector); // ¿todo, más parametros? Soy le hombre de plastico, joder.
         companies[companyAdmin] = company;
         companiesBySector[sector].push(companyAdmin);
-        company.addEmployee(msg.sender, adminTitle, adminSalary);
-        emit CompanyAdded(address(company), sector);
+        emit CompanyAdded(companyAdmin, address(company), sector);
     }
 
     function removeCompany(address companyAddress) public {
@@ -65,7 +65,7 @@ contract CompanyFactory {
             "No company registered under this address."
         );
         require(
-            companyAdmin == companies[companyAddress].employer(),
+            companyAdmin == companies[companyAddress].companyAdmin(),
             "You are not an admin at this company."
         );
 
