@@ -31,13 +31,19 @@ describe('Company', function () {
       const { company, companyAccount } = await loadFixture(defaultFixture); // load from fixture
       expect(await company.companyKey()).to.equal(companyAccount.address);
     });
+
     it('should set the correct initial data.', async function () {
       const { company } = await loadFixture(defaultFixture);
       expect(await company.sector()).to.equal(sector);
       expect(await company.companyName()).to.equal(companyName);
       expect(await company.totalEmployees()).to.equal(0);
       expect(await company.getAverageSalary()).to.equal(0);
-    })
+    });
+
+    it('should reject non-admin users as onlyEmployer', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      expect(await company.connect(employee1.onlyEmployer())).to.be.rejectedWith("You are not a company admin.");
+    });
   });
 
   describe('Adding an employee', function () {
@@ -137,24 +143,17 @@ describe('Company', function () {
 
 
     it('should not be possible for non-employee.', async function () {
-      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
-      // todo
+      const { company, employee1, employee2} = await loadFixture(employeeAddedFixture);
+      await expect(company.connect(employee2).verifySalary()).to.be.revertedWith('Not a registered employee.');
     });
 
-
-
-    it('should not be possible for other than self.', async function () {
-      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
-
-
-      // todo
-    });
 
     it('should only be possible if not already verified', async function () {
-      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
-
-
-      // todo
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      var employee = await company.employees(employee1.address);
+      await company.connect(employee1).verifySalary();
+      var employee = await company.employees(employee1.address);
+      await expect(company.connect(employee1).verifySalary()).to.be.revertedWith('Salary already verified.');
     });
 
   });
@@ -162,8 +161,31 @@ describe('Company', function () {
 
   describe('Company metadata', function () {
     it('should display correct average salary', async function () {
-      // todo
+      const { company, employee1, employee2} = await loadFixture(employeeAddedFixture);
+      const employee = await company.employees(employee1.address);
+      await company.addEmployee(employee2.address, "CTO", 40000);
+      await expect(await company.getAverageSalary()).to.equal(50000);
+    });
+    it('should return 0', async function () {
+      const { company } = await loadFixture(defaultFixture);
+      await expect(await company.getAverageSalary()).to.equal(0);
+    });
+  });
 
+  describe('Getting Salary information', function () {
+    it('should get the correct salary', async function () {
+      const { company, employee1, employee2} = await loadFixture(employeeAddedFixture);
+      const employee = await company.employees(employee2.address);
+      await company.addEmployee(employee2.address, "CTO", 40000 );
+      var value = await company.connect(employee1).getSalary(employee2.address);
+      const salary = Number(value[1]);
+      await expect(salary).to.equal(40000);
+    });
+    it('should not be possible if person is not an employee', async function () {
+      const { company, employee1, employee2} = await loadFixture(employeeAddedFixture);
+      const employee = await company.employees(employee1.address);
+      await company.updateEmployee(employee1.address, "CTO", 40000 );
+      await expect(company.connect(employee1).getSalary(employee2.address)).to.be.revertedWith("Not a registered employee.");
     });
   });
 });
