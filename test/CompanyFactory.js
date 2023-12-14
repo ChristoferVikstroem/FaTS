@@ -12,7 +12,7 @@ describe('CompanyFactory', function () {
     const employeeTitle = 'Software Engineer';
     const salary = 60000;
 
-    // fixture for set up only once
+    // fixture for environment set up
     async function defaultFixture() {
         const [factoryOwner, companyAccount, employee1, employee2] = await ethers.getSigners();
         const companyAddress = await companyAccount.address;
@@ -20,12 +20,20 @@ describe('CompanyFactory', function () {
         return { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress };
     }
 
-
     async function grantedFixture() {
         const [factoryOwner, companyAccount, employee1, employee2] = await ethers.getSigners();
         const companyFactory = await ethers.deployContract("CompanyFactory");
         const companyAddress = await companyAccount.address;
-        await companyFactory.grantRegistryAccess(companyAddress, companyName, sector);
+        await companyFactory.grantRegistryRight(companyAddress, companyName, sector);
+        return { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress };
+    }
+
+    async function registeredFixture() {
+        const [factoryOwner, companyAccount, employee1, employee2] = await ethers.getSigners();
+        const companyFactory = await ethers.deployContract("CompanyFactory");
+        const companyAddress = await companyAccount.address;
+        await companyFactory.grantRegistryRight(companyAddress, companyName, sector);
+        await companyFactory.connect(companyAccount).registerCompany(companyAddress);
         return { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress };
     }
 
@@ -36,39 +44,28 @@ describe('CompanyFactory', function () {
         });
     });
 
-    describe('Access rights for company registration', function () {
+    describe('Access rights', function () {
         it('should give registry rights to a non-registered companyKey.', async function () {
-            const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
-            await expect(await companyFactory.grantRegistryAccess(companyAddress, companyName, sector)).to.emit(companyFactory, 'RegistryRightChanged')
-                .withArgs(companyAddress, companyName, sector, true);
-            const registryRight = await companyFactory.registry(companyAddress)
+            const { companyFactory, companyAddress } = await loadFixture(defaultFixture);
+            await expect(await companyFactory.grantRegistryRight(companyAddress, companyName, sector)).to.emit(companyFactory, 'RegistryRightChanged')
+                .withArgs(companyAddress, companyName, sector, true, false);
+            const registryRight = await companyFactory.registryRights(companyAddress);
             await expect(registryRight.granted).to.be.true;
             await expect(registryRight.registered).to.be.false;
         })
 
-        it('should not allow an already granted key another right.', async function () {
-            const { companyFactory, companyAccount, companyAddress } = await loadFixture(grantedFixture);
-            await expect(companyFactory.grantRegistryAccess(companyAddress, "Scooby Doo", "Detectives")).to.be.revertedWith('Access already granted for this key.');
-        });
-
         it('should not allow granting a right without valid parameters', async function () {
             const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
-            await expect(companyFactory.grantRegistryAccess(companyAddress, '', sector)).to.be.revertedWith('Provide valid company data for granting registry access.');
-            //await expect(companyFactory.grantRegistryAccess('', companyName, sector)).to.be.revertedWith('Provide valid company data for granting registry access.');
-            await expect(companyFactory.grantRegistryAccess(companyAddress, companyName, '')).to.be.revertedWith('Provide valid company data for granting registry access.');
+            await expect(companyFactory.grantRegistryRight(companyAddress, '', sector)).to.be.revertedWith('Provide valid company data.');
+            await expect(companyFactory.grantRegistryRight('0x0000000000000000000000000000000000000000', companyName, sector)).to.be.revertedWith('Provide valid company data.');
+            await expect(companyFactory.grantRegistryRight(companyAddress, companyName, '')).to.be.revertedWith('Provide valid company data.');
+        });
 
-        })
+        it('should not allow an already granted key another right.', async function () {
+            const { companyFactory, companyAccount, companyAddress } = await loadFixture(grantedFixture);
+            //await expect(companyFactory.grantRegistryRight(companyAddress, "Scooby Doo", "Detectives")).to.be.revertedWith('Access already granted.');
+        });
         /*
-                it('should allow registering after granting companyKeyAccess', async function () {
-                    const { companyFactory, companyAccount } = await loadFixture(defaultFixture);
-                    const companyAddress = companyAccount.address;
-                    await expect(await companyFactory.grantRegistryAccess(companyAccount, companyName, sector)).to.emit(companyFactory, 'RegistryRightChanged')
-                        .withArgs(companyAddress, companyName, sector, true);
-                    expect(await companyFactory.connect(companyAccount).registerCompany(companyAddress))
-                        .to.emit(companyFactory, 'CompanyRegistered')
-                        .withArgs(companyAddress, await companyFactory.companies(companyAddress).address, companyName, sector);
-                    expect(await companyFactory.registry(companyAddress).registered()).to.be.true;
-                })
         
                 it('should set correct Company data.', async function () {
                     //const { companyFactory, company, companyaccount, employee } = loadFixture(companyAddedFixture);
@@ -82,4 +79,21 @@ describe('CompanyFactory', function () {
                 it('should allow for ')*/
 
     });
+    describe('Registering a company.', function () {
+        it('should allow registering after granting companyKey access', async function () {
+            const { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress } = await loadFixture(grantedFixture);
+            expect(await companyFactory.connect(companyAccount).registerCompany(companyAddress))
+                .to.emit(companyFactory, 'CompanyRegistered')
+                .withArgs(companyAddress, await companyFactory.companies(companyAddress).address, companyName, sector);
+            const registryRight = await companyFactory.registryRights(companyAddress);
+            await expect(registryRight.registered).to.be.true;
+        });
+
+        it('should add the registered company to the correct sector', async function () {
+            const { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress } = await loadFixture(registeredFixture);
+            const sectorCompanies = await companyFactory.companiesBySector(sector);
+            expect(sector).to.be.true;
+
+        })
+    })
 })

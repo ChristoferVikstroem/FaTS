@@ -19,6 +19,13 @@ describe('Company', function () {
     return { company, companyAccount, employee1, employee2 }; // fixtures can return anything you consider useful for your tests
   }
 
+  async function employeeAddedFixture() {
+    const [companyAccount, employee1, employee2] = await ethers.getSigners();
+    const company = await ethers.deployContract("Company", [companyAccount, companyName, sector]);
+    await company.addEmployee(employee1.address, employeeTitle, salary);
+    return { company, companyAccount, employee1, employee2 };
+  }
+
   describe('Deployment', function () {
     it('should set the deployer as employer', async function () {
       const { company, companyAccount } = await loadFixture(defaultFixture); // load from fixture
@@ -33,50 +40,125 @@ describe('Company', function () {
     })
   });
 
-  describe('Processing of employees', function () {
-
-    it('should add an employee details correctly', async function () {
+  describe('Adding an employee', function () {
+    it('should correctly set employee details.', async function () {
       const { company, employee1 } = await loadFixture(defaultFixture);
       expect(await company.totalEmployees()).to.equal(0);
       await expect(await company.addEmployee(employee1.address, employeeTitle, salary)).to.emit(company, 'EmployeeAdded').withArgs(employee1.address, employeeTitle, salary);
       expect(await company.totalEmployees()).to.equal(1);
-      await expect(await company.isEmployee(employee1.address)).to.be.true;
+      const employee = await company.employees(employee1.address);
+      await expect(employee.isEmployee).to.be.true;
     });
 
-    it('should not allow re-registering employees', async function () {
+    it('can only be done once per address.', async function () {
       const { company, employee1 } = await loadFixture(defaultFixture);
       await company.addEmployee(employee1.address, employeeTitle, salary);
-      await expect(company.addEmployee(employee1.address, 'Angry But Cute Hedgehog', 37000)).to.be.revertedWith('Address already registered as employee.');
+      await expect(company.addEmployee(employee1.address, 'Angry But Cute Hedgehog', 37000)).to.be.revertedWith('Already registered employee.');
     });
 
-    it('should correctly remove an employee', async function () {
+    it('should not be possible for non-admins.', async function () {
+      const { company, employee1, employee2 } = await loadFixture(defaultFixture);
+      await expect(company.connect(employee1).addEmployee(employee2.address, employeeTitle, salary)).to.be.revertedWith('You are not a company admin.');
+    });
+
+    it('should not allow bad parameters.', async function () {
       const { company, employee1 } = await loadFixture(defaultFixture);
-      await company.addEmployee(employee1.address, employeeTitle, salary);
+      await expect(company.addEmployee('0x0000000000000000000000000000000000000000', 'Thursday Tango Instructor', 0)).to.be.revertedWith('Provide valid employee data.');
+      await expect(company.addEmployee(employee1.address, '', 0)).to.be.revertedWith('Provide valid employee data.');
+    });
+  });
+
+
+  describe('Removing an employee', function () {
+    it('should emit correct event parameters.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
       await expect(await company.removeEmployee(employee1.address)).to.emit(company, 'EmployeeRemoved').withArgs(employee1.address, employeeTitle, salary);
-      expect(await company.totalEmployees()).to.equal(0);
-      await expect(await company.isEmployee(employee1.address)).to.be.false;
     });
 
-    it('should correctly update an employee', async function () {
-      const { company, employee1 } = await loadFixture(defaultFixture);
-      await company.addEmployee(employee1.address, employeeTitle, salary);
+    it('should reset employee count.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      expect(await company.totalEmployees()).to.equal(1);
+      await company.removeEmployee(employee1.address);
+      expect(await company.totalEmployees()).to.equal(0);
+    });
+
+    it('should reset employee struct.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      await company.removeEmployee(employee1.address);
+      const employee = await company.employees(employee1.address);
+      await expect(employee.isEmployee).to.be.false;
+    });
+
+    it('should not be possible for non-admins.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      await expect(company.connect(employee1).removeEmployee(employee1.address)).to.be.revertedWith('You are not a company admin.');
+    });
+
+    it('should not be possible for non-existent employee.', async function () {
+      const { company, employee2 } = await loadFixture(employeeAddedFixture);
+      await expect(company.removeEmployee(employee2.address)).to.be.revertedWith('Not a registered employee.');
+      expect(await company.totalEmployees()).to.equal(1);
+    });
+  });
+
+
+  describe('Updating employee details', function () {
+    it('should emit correct event parameters.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
       expect(await company.updateEmployee(employee1.address, 'Professional Clown', 42000)).to.emit(company, 'EmployeeUpdated')
         .withArgs(employee1.address, employeeTitle, 'Professional Clown', salary, 42000);
     });
 
-    it('should not allow bad formatting of employee data', async function () {
-      // todo
-      //expect(false).to.equal(true);
+    it('should not allow empty title parameter.', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      await expect(company.updateEmployee(employee1.address, '', 0)).to.be.revertedWith('Provide valid employee data.');
     });
 
-    it('should not let a non-admin process employee data', async function () {
-      const { company, employee1, employee2 } = await loadFixture(defaultFixture);
-      await expect(company.connect(employee1).addEmployee(employee2.address, employeeTitle, salary)).to.be.revertedWith('You are not an admin of this company.');
-      await company.addEmployee(employee2.address, employeeTitle, salary);
-      await expect(company.connect(employee1).removeEmployee(employee2.address)).to.be.revertedWith('You are not an admin of this company.');
-      await expect(company.connect(employee1).updateEmployee(employee2.address, "Improper Technician", 42000)).to.be.revertedWith('You are not an admin of this company.');
+    it('should not be possible for non-admins.', async function () {
+      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
+      await expect(company.connect(employee2).updateEmployee(employee1.address, "Improper Technician", 42000)).to.be.revertedWith('You are not a company admin.');
     });
   });
+
+  describe('Query Employee details', function () {
+
+    it('should somethign..')
+  })
+
+  describe('Salary Verification', function () {
+    it('should take effect', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      var employee = await company.employees(employee1.address);
+      expect(await employee.salaryVerified).to.be.false;
+      await company.connect(employee1).verifySalary()
+      var employee = await company.employees(employee1.address);
+      await expect(await employee.salaryVerified).to.be.true;
+    });
+
+
+    it('should not be possible for non-employee.', async function () {
+      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
+      // todo
+    });
+
+
+
+    it('should not be possible for other than self.', async function () {
+      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
+
+
+      // todo
+    });
+
+    it('should only be possible if not already verified', async function () {
+      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
+
+
+      // todo
+    });
+
+  });
+
 
   describe('Company metadata', function () {
     it('should display correct average salary', async function () {
@@ -84,11 +166,4 @@ describe('Company', function () {
 
     });
   });
-
-  describe('Individual employee interaction', function () {
-    it('should allow an employee to verify their salary', async function () {
-      // todo
-    });
-  });
-
 });
