@@ -39,11 +39,6 @@ describe('Company', function () {
       expect(await company.totalEmployees()).to.equal(0);
       expect(await company.getAverageSalary()).to.equal(0);
     });
-
-    it('should reject non-admin users as onlyEmployer', async function () {
-      const { company, employee1 } = await loadFixture(employeeAddedFixture);
-      expect(await company.connect(employee1.onlyEmployer())).to.be.rejectedWith("You are not a company admin.");
-    });
   });
 
   describe('Adding an employee', function () {
@@ -118,6 +113,10 @@ describe('Company', function () {
     it('should not allow empty title parameter.', async function () {
       const { company, employee1 } = await loadFixture(employeeAddedFixture);
       await expect(company.updateEmployee(employee1.address, '', 0)).to.be.revertedWith('Provide valid employee data.');
+    });
+    it('should be unable to update non-existing employee', async function () {
+      const { company, employee1 , employee2} = await loadFixture(employeeAddedFixture);
+      await expect(company.updateEmployee(employee2.address, 'Scooby Doo', 50)).to.be.revertedWith('Not a registered employee.');
     });
 
     it('should not be possible for non-admins.', async function () {
