@@ -12,8 +12,9 @@ pragma solidity >=0.5.0 <0.9.0;
 
 contract Company {
     // company details
-    address public employer; // todo decide on name: employer or companyAdmin, use same in both contracts.
+    address public companyKey;
     string public sector; // final
+    string public companyName;
     uint256 public totalEmployees;
     uint256 private totalSalaries;
 
@@ -46,15 +47,20 @@ contract Company {
     modifier onlyEmployer() {
         // todo: add functionality to add/remove employers/admins? and access control
         require(
-            msg.sender == employer,
+            msg.sender == companyKey,
             "You are not an admin of this company."
         );
         _;
     }
 
-    constructor(address _employer, string memory _sector) {
+    constructor(
+        address _companyKey,
+        string memory _companyName,
+        string memory _sector
+    ) {
         // todo any additional data we want to give a company?
-        employer = _employer;
+        companyKey = _companyKey;
+        companyName = _companyName;
         sector = _sector;
     }
 
