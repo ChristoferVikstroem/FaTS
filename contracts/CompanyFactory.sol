@@ -67,11 +67,12 @@ contract CompanyFactory {
     }
 
     function revokeRegistryRight(address companyKey) public onlyOwner {
+        /* allows the owner of the factory to revoke a registry right if not  */
         require(
             registryRights[companyKey].granted,
             "No registry access granted."
         );
-        require(
+        require( // todo remove?
             !registryRights[companyKey].registered,
             "Company already registered."
         );
@@ -86,39 +87,41 @@ contract CompanyFactory {
     }
 
     function registerCompany(address companyKey) public {
+        /* allows an account with registry rights to register a Company */
         require(
-            registryRights[companyKey].granted,
+            registryRights[companyKey].granted && msg.sender == companyKey,
             "No register access granted."
         );
         require(
-            !registryRights[companyKey].registered,
+            !registryRights[msg.sender].registered,
             "Address already registered."
         );
         // register and revoke any rights to register again
-        registryRights[companyKey].registered = true;
-        registryRights[companyKey].granted = false;
+        registryRights[msg.sender].registered = true;
+        registryRights[msg.sender].granted = false;
 
         // create the Company contract
         Company company = new Company(
-            companyKey,
-            registryRights[companyKey].companyName,
-            registryRights[companyKey].sector
+            msg.sender,
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
         );
 
         // add to companies mapping and corresponding sector
-        companies[companyKey] = company;
-        companiesBySector[registryRights[companyKey].sector].push(companyKey);
+        companies[msg.sender] = company;
+        companiesBySector[registryRights[msg.sender].sector].push(msg.sender);
         emit CompanyRegistered(
-            companyKey,
+            msg.sender,
             address(company),
-            registryRights[companyKey].companyName,
-            registryRights[companyKey].sector
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
         );
     }
 
     function removeCompany(address companyKey) public {
+        /* allows the company dmin or owner of factory remove a Company */
         require(
-            registryRights[msg.sender].registered,
+            registryRights[companyKey].registered,
             "No company registered for key."
         );
         require(
@@ -126,9 +129,9 @@ contract CompanyFactory {
                 msg.sender == owner,
             "Not authorized."
         );
-        registryRights[msg.sender].registered = false;
+        registryRights[companyKey].registered = false;
         address[] storage companiesInSector = companiesBySector[
-            registryRights[msg.sender].sector
+            registryRights[companyKey].sector
         ];
         for (uint256 i = 0; i < companiesInSector.length; i++) {
             if (companiesInSector[i] == companyKey) {
@@ -138,8 +141,8 @@ contract CompanyFactory {
         }
         emit CompanyRemoved(
             companyKey,
-            registryRights[msg.sender].companyName,
-            registryRights[msg.sender].sector
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector
         );
         delete companies[companyKey];
         delete registryRights[companyKey];
