@@ -31,7 +31,7 @@ contract CompanyFactory {
     event CompanyRemoved(address companyKey, string companyName, string sector);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner.");
+        require(msg.sender == _owner, "Not owner.");
         _;
     }
 
