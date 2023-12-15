@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0 <0.9.0;
+pragma solidity ^0.8.18;
 import "./Company.sol";
 
 contract CompanyFactory {
-    address public owner;
+    address public immutable owner;
     mapping(address => Company) public companies;
     mapping(string => address[]) public companiesBySector;
     mapping(address => RegistryRight) public registryRights;
@@ -44,14 +44,13 @@ contract CompanyFactory {
         string memory _companyName,
         string memory _sector
     ) public onlyOwner {
-        RegistryRight storage r = registryRights[companyKey];
         require(
             companyKey != address(0) &&
                 bytes(_companyName).length > 0 &&
                 bytes(_sector).length > 0,
             "Provide valid company data."
         );
-        require(!r.granted, "Access already granted.");
+        require(!registryRights[companyKey].granted, "Access already granted.");
         registryRights[companyKey] = RegistryRight({
             companyName: _companyName,
             sector: _sector,
@@ -68,54 +67,83 @@ contract CompanyFactory {
     }
 
     function revokeRegistryRight(address companyKey) public onlyOwner {
-        RegistryRight storage r = registryRights[companyKey];
-        require(r.granted, "No registry access granted.");
-        require(!r.registered, "Company already registered.");
-        r.granted = false;
+        /* allows the owner of the factory to revoke a registry right if not  */
+        require(
+            registryRights[companyKey].granted,
+            "No registry access granted."
+        );
+        require( // todo remove?
+            !registryRights[companyKey].registered,
+            "Company already registered."
+        );
+        registryRights[companyKey].granted = false;
         emit RegistryRightChanged(
             companyKey,
-            r.companyName,
-            r.sector,
-            r.granted,
-            r.registered
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector,
+            registryRights[companyKey].granted,
+            registryRights[companyKey].registered
         );
     }
 
     function registerCompany(address companyKey) public {
-        RegistryRight storage r = registryRights[companyKey];
-        require(r.granted, "No register access granted.");
-        require(!r.registered, "Address already registered.");
-        r.registered = true;
-        r.granted = false;
+        /* allows an account with registry rights to register a Company */
+        require(
+            registryRights[companyKey].granted && msg.sender == companyKey,
+            "No register access granted."
+        );
+        require(
+            !registryRights[msg.sender].registered,
+            "Address already registered."
+        );
+        // register and revoke any rights to register again
+        registryRights[msg.sender].registered = true;
+        registryRights[msg.sender].granted = false;
 
-        Company company = new Company(companyKey, r.companyName, r.sector);
-        companies[companyKey] = company;
-        companiesBySector[r.sector].push(companyKey);
+        // create the Company contract
+        Company company = new Company(
+            msg.sender,
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
+        );
+
+        // add to companies mapping and corresponding sector
+        companies[msg.sender] = company;
+        companiesBySector[registryRights[msg.sender].sector].push(msg.sender);
         emit CompanyRegistered(
-            companyKey,
+            msg.sender,
             address(company),
-            r.companyName,
-            r.sector
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
         );
     }
 
     function removeCompany(address companyKey) public {
-        address revoker = msg.sender;
-        RegistryRight storage r = registryRights[revoker];
-        require(r.registered, "No company registered for key.");
+        /* allows the company dmin or owner of factory remove a Company */
         require(
-            revoker == companies[companyKey].companyKey() || revoker == owner,
+            registryRights[companyKey].registered,
+            "No company registered for key."
+        );
+        require(
+            msg.sender == companies[companyKey].companyKey() ||
+                msg.sender == owner,
             "Not authorized."
         );
-        r.registered = false;
-        address[] storage companiesInSector = companiesBySector[r.sector];
+        registryRights[companyKey].registered = false;
+        address[] storage companiesInSector = companiesBySector[
+            registryRights[companyKey].sector
+        ];
         for (uint256 i = 0; i < companiesInSector.length; i++) {
             if (companiesInSector[i] == companyKey) {
                 delete companiesInSector[i];
                 break;
             }
         }
-        emit CompanyRemoved(companyKey, r.companyName, r.sector);
+        emit CompanyRemoved(
+            companyKey,
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector
+        );
         delete companies[companyKey];
         delete registryRights[companyKey];
     }
@@ -132,12 +160,19 @@ contract CompanyFactory {
             uint256 averageSalary
         )
     {
-        RegistryRight storage r = registryRights[companyKey];
-        require(r.registered, "No such company registered.");
+        require(
+            registryRights[companyKey].registered,
+            "No such company registered."
+        );
         Company company = companies[companyKey];
         totalEmployees = company.totalEmployees();
         averageSalary = company.getAverageSalary();
-        return (r.companyName, r.sector, totalEmployees, averageSalary);
+        return (
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector,
+            totalEmployees,
+            averageSalary
+        );
     }
 
     function getCompanyAddressesInSector(
