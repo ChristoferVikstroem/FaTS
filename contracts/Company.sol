@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0 <0.9.0;
+pragma solidity ^0.8.18;
 
 contract Company {
     // company details
-    address public companyKey;
+    address public immutable companyKey;
     string public sector;
     string public companyName;
     uint256 public totalEmployees;
@@ -72,6 +72,7 @@ contract Company {
         string memory _sector
     ) {
         // require input validation
+        require(_companyKey != address(0), "Provide a valid address.");
         companyKey = _companyKey;
         companyName = _companyName;
         sector = _sector;

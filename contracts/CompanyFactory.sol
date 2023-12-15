@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0 <0.9.0;
+pragma solidity ^0.8.18;
 import "./Company.sol";
 
 contract CompanyFactory {
-    address public owner;
+    address public immutable owner;
     mapping(address => Company) public companies;
     mapping(string => address[]) public companiesBySector;
     mapping(address => RegistryRight) public registryRights;
