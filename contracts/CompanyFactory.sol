@@ -31,7 +31,7 @@ contract CompanyFactory {
     event CompanyRemoved(address companyKey, string companyName, string sector);
 
     modifier onlyOwner() {
-        require(msg.sender == _owner, "Not owner.");
+        require(msg.sender == owner, "Not owner.");
         _;
     }
 
@@ -120,7 +120,9 @@ contract CompanyFactory {
         delete registryRights[companyKey];
     }
 
-    function getCompanyDetails(address companyKey)
+    function getCompanyDetails(
+        address companyKey
+    )
         public
         view
         returns (
@@ -138,28 +140,25 @@ contract CompanyFactory {
         return (r.companyName, r.sector, totalEmployees, averageSalary);
     }
 
-    function getCompanyAddressesInSector(string memory sector)
-        public
-        view
-        returns (address[] memory)
-    {
+    function getCompanyAddressesInSector(
+        string memory sector
+    ) public view returns (address[] memory) {
         return companiesBySector[sector];
     }
 
-    function getAverageSalaryInSector(string memory sector)
-        public
-        view
-        returns (uint256)
-    {
+    function getAverageSalaryInSector(
+        string memory sector
+    ) public view returns (uint256) {
         uint256 totalSalaries;
         uint256 totalEmployees;
         address[] memory c = companiesBySector[sector];
         for (uint256 i = 0; i < c.length; i++) {
             Company company = Company(c[i]);
-            totalSalaries += company.getAverageSalary() *
+            totalSalaries +=
+                company.getAverageSalary() *
                 company.totalEmployees();
             totalEmployees += company.totalEmployees();
-            }
+        }
         if (totalEmployees > 0) {
             uint256 average = totalSalaries / totalEmployees;
             return average;
