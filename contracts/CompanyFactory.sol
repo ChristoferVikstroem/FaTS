@@ -38,7 +38,7 @@ contract CompanyFactory {
         _;
     }
 
-    constructor() payable {
+    constructor() {
         owner = msg.sender;
     }
 

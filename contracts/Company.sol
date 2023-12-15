@@ -51,13 +51,14 @@ contract Company {
         address _companyKey,
         string memory _companyName,
         string memory _sector
-    ) payable {
+    ) {
+        // require input validation
         companyKey = _companyKey;
         companyName = _companyName;
         sector = _sector;
     }
 
-    // employee functionality
+    // employee functionalitypul
 
     function addEmployee(
         address employeeAddress,
