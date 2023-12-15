@@ -86,10 +86,10 @@ contract CompanyFactory {
         );
     }
 
-    function registerCompany() public {
+    function registerCompany(address companyKey) public {
         /* allows an account with registry rights to register a Company */
         require(
-            registryRights[msg.sender].granted,
+            registryRights[companyKey].granted && msg.sender == companyKey,
             "No register access granted."
         );
         require(
