@@ -1,49 +1,67 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0 <0.9.0;
-
-/* todo: proper use of memory, calldata, storage
- * memory is used to store temporary data that is needed during the execution of a function.
- * calldata is used to store function arguments that are passed in from an external caller.
- * storage is used to store data permanently on the blockchain.
- */
-
-// todo snapshot function
+pragma solidity ^0.8.18;
 
 contract Company {
     // company details
-    address public companyKey;
+    address public immutable companyKey;
     string public sector;
     string public companyName;
     uint256 public totalEmployees;
     uint256 private totalSalaries;
-    mapping(address => Employee) public employees; // {address1: Employee object, address2: e}
+    mapping(address => Employee) public employees;
 
     // gender, yrs experience, update or calculate.
+    enum Gender {
+        Female,
+        Male,
+        Other
+    }
+
     struct Employee {
         string title;
+        Gender gender;
         uint256 salary;
+        uint32 yearsPriorExperience;
+        uint256 dateEmployed;
         bool isEmployee;
         bool salaryVerified;
     }
 
-    // todo, make into one event?
-    event EmployeeAdded(address employeeAddress, string title, uint256 salary);
+    event EmployeeAdded(
+        address employeeAddress,
+        string title,
+        Gender gender,
+        uint256 salary,
+        uint32 yearsOfExperience
+    );
+
     event EmployeeRemoved(
         address employeeAddress,
         string title,
-        uint256 salary
+        Gender gender,
+        uint256 salary,
+        uint32 yearsPriorExperience,
+        uint256 dateEmployed
     );
     event EmployeeUpdated(
         address employeeAddress,
         string oldTitle,
         string newTitle,
         uint256 oldSalary,
-        uint256 newSalary
+        uint256 newSalary,
+        Gender oldGender,
+        Gender newGender
     );
-    event SalaryVerified(address employeeAddress, string title, uint256 salary);
+
+    event SalaryVerified(
+        address employeeAddress,
+        string title,
+        Gender gender,
+        uint256 salary
+    );
 
     modifier onlyEmployer() {
-        // todo: add functionality to add/remove employers/admins? and access control
+        // todo: add access control library?
         require(msg.sender == companyKey, "You are not a company admin.");
         _;
     }
@@ -54,74 +72,95 @@ contract Company {
         string memory _sector
     ) {
         // require input validation
+        require(_companyKey != address(0), "Provide a valid address.");
         companyKey = _companyKey;
         companyName = _companyName;
         sector = _sector;
     }
 
-    // employee functionalitypul
-
     function addEmployee(
         address employeeAddress,
         string memory _title,
+        Gender _gender,
+        uint32 _yearsPriorExperience,
         uint256 _salary
     ) external onlyEmployer {
-        Employee storage e = employees[employeeAddress];
-        require(!e.isEmployee, "Already registered employee.");
+        require(
+            !employees[employeeAddress].isEmployee,
+            "Already registered employee."
+        );
         require(
             employeeAddress != address(0) && bytes(_title).length > 0,
             "Provide valid employee data."
         );
-        e.isEmployee = true;
-
         employees[employeeAddress] = Employee({
             title: _title,
             salary: _salary,
+            gender: _gender,
+            yearsPriorExperience: _yearsPriorExperience,
+            dateEmployed: block.timestamp,
             salaryVerified: false,
             isEmployee: true
         });
         totalSalaries = totalSalaries + _salary;
         totalEmployees = totalEmployees + 1;
-        emit EmployeeAdded(employeeAddress, _title, _salary);
+        emit EmployeeAdded(
+            employeeAddress,
+            _title,
+            _gender,
+            _salary,
+            _yearsPriorExperience
+        );
     }
 
     function removeEmployee(address employeeAddress) external onlyEmployer {
-        Employee storage e = employees[employeeAddress];
-        require(e.isEmployee, "Not a registered employee.");
-        e.isEmployee = false;
-        // remove global employee data
-        string memory title = e.title;
-        uint256 salary = e.salary;
-        totalSalaries = totalSalaries - salary;
+        require(
+            employees[employeeAddress].isEmployee,
+            "Not a registered employee."
+        );
+        Employee memory removedEmployee = employees[employeeAddress];
+        employees[employeeAddress].isEmployee = false;
+        totalSalaries = totalSalaries - removedEmployee.salary;
         totalEmployees = totalEmployees - 1;
-        // remove employee
-        delete employees[employeeAddress]; // test this
-        emit EmployeeRemoved(employeeAddress, title, salary);
+        emit EmployeeRemoved(
+            employeeAddress,
+            removedEmployee.title,
+            removedEmployee.gender,
+            removedEmployee.salary,
+            removedEmployee.yearsPriorExperience,
+            removedEmployee.dateEmployed
+        );
+        delete employees[employeeAddress];
     }
 
+    // todo, update years experience?
     function updateEmployee(
         address employeeAddress,
         string memory newTitle,
+        Gender newGender,
         uint256 newSalary
     ) external onlyEmployer {
-        Employee storage e = employees[employeeAddress];
-        require(e.isEmployee, "Not a registered employee.");
+        require(
+            employees[employeeAddress].isEmployee,
+            "Not a registered employee."
+        );
         require(bytes(newTitle).length > 0, "Provide valid employee data.");
-        // remove global data
-        // todo lock?
-        string memory oldTitle = e.title;
-        uint256 oldSalary = e.salary;
-        e.salaryVerified = false;
-        e.salary = newSalary;
-        e.title = newTitle;
-        totalSalaries = totalSalaries - oldSalary;
+
+        Employee memory oldEmployee = employees[employeeAddress];
+        employees[employeeAddress].salaryVerified = false;
+        employees[employeeAddress].salary = newSalary;
+        employees[employeeAddress].title = newTitle;
+        totalSalaries = totalSalaries - oldEmployee.salary;
         totalSalaries = totalSalaries + newSalary;
+
         emit EmployeeUpdated(
             employeeAddress,
-            oldTitle,
+            oldEmployee.title,
             newTitle,
-            oldSalary,
-            newSalary
+            oldEmployee.salary,
+            newSalary,
+            oldEmployee.gender,
+            newGender
         );
     }
 
@@ -129,8 +168,7 @@ contract Company {
     // todo: functionality that should be moved off-chain?
     function getAverageSalary() external view returns (uint256) {
         if (totalEmployees > 0) {
-            uint256 averageSalary = totalSalaries / totalEmployees;
-            return averageSalary;
+            return totalSalaries / totalEmployees;
         } else {
             return 0;
         }
@@ -139,16 +177,30 @@ contract Company {
     function getSalary(
         address employeeAddress
     ) public view returns (string memory title, uint256 salary, bool verified) {
-        Employee storage e = employees[employeeAddress];
-        require(e.isEmployee, "Not a registered employee.");
-        return (e.title, e.salary, e.salaryVerified);
+        require(
+            employees[employeeAddress].isEmployee,
+            "Not a registered employee."
+        );
+        return (
+            employees[employeeAddress].title,
+            employees[employeeAddress].salary,
+            employees[employeeAddress].salaryVerified
+        );
     }
-// TODO change all structs to just be msg.sender
-    // Function for an employee to verify their salary
+
     function verifySalary() external {
+        /* lets an employee verify their own salary */
         require(employees[msg.sender].isEmployee, "Not a registered employee.");
-        require(!employees[msg.sender].salaryVerified, "Salary already verified.");
+        require(
+            !employees[msg.sender].salaryVerified,
+            "Salary already verified."
+        );
         employees[msg.sender].salaryVerified = true;
-        emit SalaryVerified(msg.sender, employees[msg.sender].title, employees[msg.sender].salary);
+        emit SalaryVerified(
+            msg.sender,
+            employees[msg.sender].title,
+            employees[msg.sender].gender,
+            employees[msg.sender].salary
+        );
     }
 }
