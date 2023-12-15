@@ -18,10 +18,11 @@ contract Company {
     uint256 private totalSalaries;
     mapping(address => Employee) public employees; // {address1: Employee object, address2: e}
 
+    // gender, yrs experience, update or calculate.
     struct Employee {
         string title;
         uint256 salary;
-        bool isEmployee; // todo
+        bool isEmployee;
         bool salaryVerified;
     }
 
@@ -72,7 +73,6 @@ contract Company {
         );
         e.isEmployee = true;
 
-        // todo lock?
         employees[employeeAddress] = Employee({
             title: _title,
             salary: _salary,
@@ -127,8 +127,9 @@ contract Company {
     // get the average salary of employees in the company
     // todo: functionality that should be moved off-chain?
     function getAverageSalary() external view returns (uint256) {
-        if (totalEmployees >= 1) {
-            return totalSalaries / totalEmployees;
+        if (totalEmployees > 0) {
+            uint256 averageSalary = totalSalaries / totalEmployees;
+            return averageSalary;
         } else {
             return 0;
         }
@@ -141,14 +142,12 @@ contract Company {
         require(e.isEmployee, "Not a registered employee.");
         return (e.title, e.salary, e.salaryVerified);
     }
-
+// TODO change all structs to just be msg.sender
     // Function for an employee to verify their salary
     function verifySalary() external {
-        address employeeAddress = msg.sender;
-        Employee storage e = employees[employeeAddress];
-        require(e.isEmployee, "Not a registered employee.");
-        require(!e.salaryVerified, "Salary already verified.");
-        e.salaryVerified = true;
-        emit SalaryVerified(employeeAddress, e.title, e.salary);
+        require(employees[msg.sender].isEmployee, "Not a registered employee.");
+        require(!employees[msg.sender].salaryVerified, "Salary already verified.");
+        employees[msg.sender].salaryVerified = true;
+        emit SalaryVerified(msg.sender, employees[msg.sender].title, employees[msg.sender].salary);
     }
 }

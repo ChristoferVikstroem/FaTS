@@ -2,15 +2,12 @@
 pragma solidity >=0.5.0 <0.9.0;
 import "./Company.sol";
 
-// todo fix sized arrays.
-
 contract CompanyFactory {
-    // variables and mappings
     address public owner;
-    mapping(address => Company) public companies; // indexed by company id, id created when creating companu
-    mapping(string => address[]) public companiesBySector; // maps a sector string to ids of companies in this sector.
-    //mapping(string => address[]) public companiesBySize; // for example.. small, medium, large
+    mapping(address => Company) public companies;
+    mapping(string => address[]) public companiesBySector;
     mapping(address => RegistryRight) public registryRights;
+
     struct RegistryRight {
         string companyName;
         string sector;
@@ -18,7 +15,6 @@ contract CompanyFactory {
         bool registered;
     }
 
-    // events and modifiers
     event RegistryRightChanged(
         address companyKey,
         string companyName,
@@ -33,6 +29,7 @@ contract CompanyFactory {
         string sector
     );
     event CompanyRemoved(address companyKey, string companyName, string sector);
+
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner.");
         _;
@@ -41,8 +38,6 @@ contract CompanyFactory {
     constructor() payable {
         owner = msg.sender;
     }
-
-    // company registration and deletion
 
     function grantRegistryRight(
         address companyKey,
@@ -88,12 +83,11 @@ contract CompanyFactory {
 
     function registerCompany(address companyKey) public {
         RegistryRight storage r = registryRights[companyKey];
-        require(r.granted, "No register acccess granted.");
+        require(r.granted, "No register access granted.");
         require(!r.registered, "Address already registered.");
         r.registered = true;
-        r.granted = false; // reset grant
+        r.granted = false;
 
-        // create Company instance using granted name and sector
         Company company = new Company(companyKey, r.companyName, r.sector);
         companies[companyKey] = company;
         companiesBySector[r.sector].push(companyKey);
@@ -110,31 +104,23 @@ contract CompanyFactory {
         RegistryRight storage r = registryRights[revoker];
         require(r.registered, "No company registered for key.");
         require(
-            (revoker == companies[companyKey].companyKey() || revoker == owner), // todo, access right implementation instead.
+            revoker == companies[companyKey].companyKey() || revoker == owner,
             "Not authorized."
         );
         r.registered = false;
-        address[] memory companiesInSector = companiesBySector[r.sector];
-        // todo, might need to lock while removing.
-        // todo: handle deletion from arrays other way?
-        for (uint i = 0; i < companiesInSector.length; i++) {
+        address[] storage companiesInSector = companiesBySector[r.sector];
+        for (uint256 i = 0; i < companiesInSector.length; i++) {
             if (companiesInSector[i] == companyKey) {
                 delete companiesInSector[i];
+                break;
             }
         }
-        companiesBySector[r.sector] = companiesInSector;
-        // todo, think about logic for removing a contract, since the other instance still lives
-        delete companies[companyKey];
         emit CompanyRemoved(companyKey, r.companyName, r.sector);
+        delete companies[companyKey];
         delete registryRights[companyKey];
     }
 
-    // query
-    // todo: should we even have average salary functionality here? or is that rather processed in a front end.
-
-    function getCompanyDetails(
-        address companyKey
-    )
+    function getCompanyDetails(address companyKey)
         public
         view
         returns (
@@ -152,32 +138,31 @@ contract CompanyFactory {
         return (r.companyName, r.sector, totalEmployees, averageSalary);
     }
 
-    function getCompanyAddressesInSector(
-        string memory sector
-    ) public view returns (address[] memory) {
+    function getCompanyAddressesInSector(string memory sector)
+        public
+        view
+        returns (address[] memory)
+    {
         return companiesBySector[sector];
     }
 
-    // function to get the average salary of employees in a sector
-    /*  todo: this processing should perhaps be done in a front end. 
-             and the function just returns _data_ about the sector.
-        todo: what is reasonable to query for a sector? what should be returned. */
-    function getAverageSalaryInSector(
-        string memory sector
-    ) public view returns (uint256) {
+    function getAverageSalaryInSector(string memory sector)
+        public
+        view
+        returns (uint256)
+    {
         uint256 totalSalaries;
         uint256 totalEmployees;
-
-        for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
-            Company company = Company(companiesBySector[sector][i]);
-            totalSalaries +=
-                company.getAverageSalary() *
+        address[] memory c = companiesBySector[sector];
+        for (uint256 i = 0; i < c.length; i++) {
+            Company company = Company(c[i]);
+            totalSalaries += company.getAverageSalary() *
                 company.totalEmployees();
             totalEmployees += company.totalEmployees();
-        }
-
-        if (totalEmployees >= 1) {
-            return totalSalaries / totalEmployees;
+            }
+        if (totalEmployees > 0) {
+            uint256 average = totalSalaries / totalEmployees;
+            return average;
         } else {
             return 0;
         }
