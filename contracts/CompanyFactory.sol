@@ -146,24 +146,26 @@ contract CompanyFactory {
         return companiesBySector[sector];
     }
 
-    function getAverageSalaryInSector(
-        string memory sector
-    ) public view returns (uint256) {
-        uint256 totalSalaries;
-        uint256 totalEmployees;
-        address[] memory c = companiesBySector[sector];
-        for (uint256 i = 0; i < c.length; i++) {
-            Company company = Company(c[i]);
-            totalSalaries +=
-                company.getAverageSalary() *
-                company.totalEmployees();
+    function getAverageSalaryInSector(string memory sector) public view returns (uint256) {
+    uint256 totalSalaries;
+    uint256 totalEmployees;
+    uint256 result = 0;
+    for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
+        Company company = companies[companiesBySector[sector][i]];
+
+        // Check if company has employees before adding to totalSalaries
+        if (company.totalEmployees() > 0) {
+            totalSalaries += company.getAverageSalary() * company.totalEmployees();
             totalEmployees += company.totalEmployees();
         }
-        if (totalEmployees > 0) {
-            uint256 average = totalSalaries / totalEmployees;
-            return average;
-        } else {
-            return 0;
-        }
     }
+    // Avoid division by zero
+    if (totalEmployees > 0) {
+        result = totalSalaries / totalEmployees;
+        return result;
+    } else {
+        return result;
+    }
+}
+
 }

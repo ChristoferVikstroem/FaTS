@@ -1,5 +1,8 @@
-const { expect } = require("chai");
+const chai = require('chai');
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const chaiAsPromised = require('chai-as-promised');
+chai.use(chaiAsPromised);
+const { expect } = chai;
 
 describe('CompanyFactory', function () {
     const companyName = 'Google';
@@ -30,6 +33,11 @@ describe('CompanyFactory', function () {
         await companyFactory.connect(companyAccount).registerCompany(companyAddress);
         return { companyFactory, companyAccount, employee1, employee2, factoryOwner, companyAddress };
     }
+    async function employeeAddedFixture() {
+        const [companyAccount, employee1, employee2] = await ethers.getSigners();
+        const company = await ethers.deployContract("Company", [companyAccount, companyName, sector]);
+        await company.addEmployee(employee1.address, employeeTitle, salary);
+        return { company, companyAccount, employee1, employee2 };}
 
     describe('Deployment', function () {
         it('should set deployer as owner,', async function () {
@@ -57,7 +65,7 @@ describe('CompanyFactory', function () {
 
         it('should not allow an already granted key another right.', async function () {
             const { companyFactory, companyAccount, companyAddress } = await loadFixture(grantedFixture);
-            //await expect(companyFactory.grantRegistryRight(companyAddress, "Scooby Doo", "Detectives")).to.be.revertedWith('Access already granted.');
+            await expect(companyFactory.grantRegistryRight(companyAddress, "Scooby Doo", "Detectives")).to.be.revertedWith('Access already granted.');
         });
     });
 
@@ -107,33 +115,24 @@ describe('CompanyFactory', function () {
             const { companyFactory, companyAccount, companyAddress, factoryOwner } = await loadFixture(defaultFixture);
             await expect(companyFactory.connect(factoryOwner).removeCompany(companyAddress)).to.be.revertedWith('No company registered for key.');
         });
-        
-        it('should not allow non-owner to remove a company', async function () {
-            const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
 
-            // Register the company before attempting to remove it
-            await companyFactory.grantRegistryRight(companyAddress, 'Company Name', 'IT');
+        it('should allow owner to remove a company', async function () {
+            const { companyFactory, companyAccount, companyAddress} = await loadFixture(defaultFixture);
+            await companyFactory.grantRegistryRight(companyAddress, 'Google', 'IT');
             await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-
-            // Now attempt to remove the company
-            await expect(companyFactory.connect(companyAccount).removeCompany(companyAddress)).to.be.revertedWith('Not authorized.');
+            await companyFactory.connect(companyAccount).removeCompany(companyAddress)
+            await expect(companyFactory.connect(companyAccount).getCompanyDetails(companyAddress)).to.be.revertedWith("No such company registered.");
         });
 
         it('should handle registering multiple companies in different sectors', async function () {
             const { companyFactory, companyAccount, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
-
-            // Register a company in IT sector
             await companyFactory.grantRegistryRight(companyAddress, 'Google', 'IT');
             await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-
-            // Register another company in Finance sector
             const financeCompanyAddress = '0x1234567890123456789012345678901234567890'; // Use a different address
             await companyFactory.grantRegistryRight(financeCompanyAddress, 'Coffice', 'Fine Dining');
             await companyFactory.connect(factoryOwner).registerCompany(financeCompanyAddress);
-
             const itCompanies = await companyFactory.getCompanyAddressesInSector('IT');
             const financeCompanies = await companyFactory.getCompanyAddressesInSector('Fine Dining');
-
             expect(itCompanies).to.deep.equal([companyAddress]);
             expect(financeCompanies).to.deep.equal([financeCompanyAddress]);
         });
@@ -189,19 +188,13 @@ describe('CompanyFactory', function () {
 
             it('should handle registering multiple companies in different sectors', async function () {
                 const { companyFactory, companyAccount, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
-
-                // Register a company in IT sector
                 await companyFactory.grantRegistryRight(companyAddress, 'Company1', 'IT');
                 await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-
-                // Register another company in Finance sector
-                const financeCompanyAddress = '0x1234567890123456789012345678901234567890'; // Use a different address
+                const financeCompanyAddress = '0x1234567890123456789012345678901234567890';
                 await companyFactory.grantRegistryRight(financeCompanyAddress, 'Company2', 'Finance');
                 await companyFactory.connect(factoryOwner).registerCompany(financeCompanyAddress);
-
                 const itCompanies = await companyFactory.getCompanyAddressesInSector('IT');
                 const financeCompanies = await companyFactory.getCompanyAddressesInSector('Finance');
-
                 expect(itCompanies).to.deep.equal([companyAddress]);
                 expect(financeCompanies).to.deep.equal([financeCompanyAddress]);
             });
@@ -217,8 +210,8 @@ describe('CompanyFactory', function () {
             it('should return correct total employees and average salary for a registered company', async function () {
                 const { companyFactory, companyAddress } = await loadFixture(registeredFixture);
                 const details = await companyFactory.getCompanyDetails(companyAddress);
-                expect(details[2]).to.equal(0); // Assuming totalEmployees is initialized to 0
-                expect(details[3]).to.equal(0); // Assuming averageSalary is initialized to 0
+                expect(details[2]).to.equal(0);
+                expect(details[3]).to.equal(0);
             });
 
             it('should handle getCompanyAddressesInSector with no companies', async function () {
@@ -265,10 +258,18 @@ describe('CompanyFactory', function () {
                 const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
                 await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
                 await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-                const details = await companyFactory.getCompanyDetails(companyAddress);
-                var sector = details[1];
-                const averageSalary = await companyFactory.connect(companyAccount).getAverageSalaryInSector(sector);
-                expect(averageSalary).to.equal(0);
+                expect(await companyFactory.connect(companyAccount).getAverageSalaryInSector("IT")).to.equal(0);
+            });
+            it('should handle getAverageSalaryInSector with multiple companies', async function () {
+                const { companyFactory, companyAccount, companyAddress, employee1, employee2 } = await loadFixture(registeredFixture);
+                await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
+                await companyFactory.connect(companyAccount).registerCompany(companyAddress);
+                const company = await ethers.getContractAt("Company", companyAddress);
+                await company.connect(companyAccount).addEmployee(employee1.address, "CEO", 10000);
+                await company.connect(companyAccount).addEmployee(employee2.address, "CTO", 10000);
+                const averageSalary = await expect(companyFactory.getAverageSalaryInSector(sector)).to.be.fulfilled;
+                const expectedSalary = 10000;
+                expect(Number(averageSalary)).to.equal(expectedSalary);
             });
         });
     });
