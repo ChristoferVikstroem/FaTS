@@ -11,6 +11,7 @@ contract Company {
     uint256 public totalEmployees;
     uint256 private totalSalaries;
     mapping(address => Employee) public employees;
+    address[] public employeeAddresses;
 
     struct Employee {
         string title;
@@ -73,6 +74,7 @@ contract Company {
             salaryVerified: false,
             isEmployee: true
         });
+        employeeAddresses.push(employeeAddress);
         totalSalaries = totalSalaries + _salary;
         totalEmployees = totalEmployees + 1;
         emit EmployeeAdded(employeeAddress, _title, _salary);
@@ -87,6 +89,18 @@ contract Company {
         employees[employeeAddress].isEmployee = false;
         totalSalaries = totalSalaries - removedEmployee.salary;
         totalEmployees = totalEmployees - 1;
+
+        for (uint256 i = 0; i < employeeAddresses.length; i++) {
+            // remove from array
+            if (employeeAddresses[i] == employeeAddress) {
+                for (uint256 j = i; j < employeeAddresses.length - 1; j++) {
+                    employeeAddresses[j] = employeeAddresses[j + 1];
+                }
+                employeeAddresses.pop();
+                break;
+            }
+        }
+
         emit EmployeeRemoved(
             employeeAddress,
             removedEmployee.title,
@@ -128,6 +142,10 @@ contract Company {
         } else {
             return 0;
         }
+    }
+
+    function getEmployees() public view returns (address[] memory addresses) {
+        return employeeAddresses;
     }
 
     function getSalary(

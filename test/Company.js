@@ -90,6 +90,16 @@ describe('Company', function () {
       await expect(employee.isEmployee).to.be.false;
     });
 
+
+    it('should remove employee from address array', async function () {
+      const { company, employee1 } = await loadFixture(employeeAddedFixture);
+      const before = await company.getEmployees();
+      await expect(before).to.deep.equal([employee1.address]);
+      await company.removeEmployee(employee1.address);
+      const after = await company.getEmployees();
+      await expect(after).to.deep.equal([]);
+    });
+
     it('should not be possible for non-admins', async function () {
       const { company, employee1 } = await loadFixture(employeeAddedFixture);
       await expect(company.connect(employee1).removeEmployee(employee1.address)).to.be.revertedWith('You are not a company admin.');
