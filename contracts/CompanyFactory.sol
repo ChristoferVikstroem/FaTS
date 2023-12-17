@@ -138,10 +138,13 @@ contract CompanyFactory {
         ];
         for (uint256 i = 0; i < companiesInSector.length; i++) {
             if (companiesInSector[i] == companyKey) {
-                delete companiesInSector[i];
-                break;
+            for (uint256 j = i; j < companiesInSector.length - 1; j++) {
+                companiesInSector[j] = companiesInSector[j + 1];
             }
+            companiesInSector.pop(); // Remove the last element (which is now a duplicate)
+            break;
         }
+    }
         emit CompanyRemoved(
             companyKey,
             registryRights[companyKey].companyName,

@@ -29,15 +29,15 @@ The protocol are written in Solidity and contains two contracts: CompanyFactory.
 **Deployment** 
 - Deploy the CompanyFactory smart contract to the Sepolia blockchain.
 
-**Company Registration**
+**Granting and Revoking registration rights (onlyOwner)**
 
-1. Call the createCompany function to register a new company within a specific sector.
-2. Provide the sector name, admin title, and admin salary.
+Granting: Call the grantRegistryRight function to grant a company within a specific sector registration right.
+Revoking: Call the revokeRegistryRight function with the company key as parameter input to remove that company's registration right.
 
-**Company Deletion**
+**Registering or Removing company (requires company specific key)**
+Registering: Call the registerCompany function with your company key as input to register the company's name within the specified sector.
+Removing: Call the removeCompany function with your company key as input to remove the company's details.
 
-1. Use the removeCompany function to delete a registered company.
-Only administrators of the company can initiate this operation.
 
 **Query Functions**
 
@@ -102,3 +102,33 @@ Only administrators of the company can initiate this operation.
 
 ### Access Control
 - The onlyEmployer modifier ensures that only the employer/administrator can execute certain functions.
+
+## Unit Test
+The protocol can be automatically executed from the test suite and is done through Hardhat. The prerequisites include having Node.js installed on the machine, which can be downloaded on https://nodejs.org. 
+### Installing Hardhat
+1. Open a terminal/command prompt.
+2. Navigate to the project directory: 
+```bash
+cd path/to/this/project
+```
+3. Initialize a new Node.js project:
+```bash
+npm init -y
+```
+4. Install Hardhat: 
+```bash
+npm install --save-dev hardhat
+```
+5. Run the tests:
+```bash
+npx hardhat test
+```
+6. Coverage testing:
+```bash
+npx hardhat coverage
+```
+
+
+## Related work
+Similar initiatives to make salaries more transparent exist but mostly exist off-chain. Most on-chain efforts in this field focus on payroll management, for instance Bitwage (https://www.bitwage.com/) that allows employees and freelancers to choose if they would like to be paid in a cryptocurrency etc. Future work on this project could include contracts to be formed between the employer and the employee where currency options would be available and automated through smart contracts.
+OpenPayrolls (https://openpayrolls.com/) and GlassDoor (https://www.glassdoor.com/) are off-chain initiatives to make salaries more transparent.
