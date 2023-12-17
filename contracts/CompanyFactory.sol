@@ -1,144 +1,204 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0 <0.9.0;
+pragma solidity ^0.8.18;
 import "./Company.sol";
 
-// todo fix sized arrays.
-// todo
-
 contract CompanyFactory {
-    // variables and mappings
-    address _owner;
-    string[] public sectors; // todo add/remove functionality or not
-    mapping(string => bool) public isSector; // todo change to sectors
-    mapping(address => bool) public isRegistered;
-    mapping(address => Company) public companies; // indexed by company id, id created when creating companu
-    mapping(string => address[]) public companiesBySector; // maps a sector string to ids of companies in this sector.
-    //mapping(string => address[]) public companiesBySize; // for example.. small, medium, large
+    address public immutable owner;
+    mapping(address => Company) public companies;
+    mapping(string => address[]) public companiesBySector;
+    mapping(address => RegistryRight) public registryRights;
 
-    // events and modifiers
-    event CompanyAdded(address companyAddress, string sector); // todo add more interestig parameters
-    event SectorAdded(string sector);
-    event SectorRemoved(string sector);
-    // todo any other relevant events
+    struct RegistryRight {
+        string companyName;
+        string sector;
+        bool granted;
+        bool registered;
+    }
+
+    event RegistryRightChanged(
+        address companyKey,
+        string companyName,
+        string sector,
+        bool granted,
+        bool registered
+    );
+    event CompanyRegistered(
+        address companyKey,
+        address contractAddress,
+        string companyName,
+        string sector
+    );
+    event CompanyRemoved(address companyKey, string companyName, string sector);
 
     modifier onlyOwner() {
-        require(msg.sender == _owner, "Not owner.");
+        require(msg.sender == owner, "Not owner.");
         _;
     }
 
     constructor() {
-        _owner = msg.sender;
+        owner = msg.sender;
     }
 
-    // company registration and deletion
-
-    function createCompany(
-        string memory sector,
-        string memory adminTitle,
-        uint256 adminSalary
-    ) public {
-        // conditions
-        address companyAdmin = msg.sender;
+    function grantRegistryRight(
+        address companyKey,
+        string memory _companyName,
+        string memory _sector
+    ) public onlyOwner {
         require(
-            !isRegistered[companyAdmin],
-            "Company already registered for this address."
+            companyKey != address(0) &&
+                bytes(_companyName).length > 0 &&
+                bytes(_sector).length > 0,
+            "Provide valid company data."
         );
-        require(
-            bytes(adminTitle).length > 0 && (adminSalary > 0),
-            "Company admin's title and salary must be submitted."
+        require(!registryRights[companyKey].granted, "Access already granted.");
+        registryRights[companyKey] = RegistryRight({
+            companyName: _companyName,
+            sector: _sector,
+            granted: true,
+            registered: false
+        });
+        emit RegistryRightChanged(
+            companyKey,
+            _companyName,
+            _sector,
+            true,
+            false
         );
-        require(isSector[sector], "Company is not a valid sector.");
-        isRegistered[companyAdmin] = true;
-
-        // create Company instance
-        Company company = new Company(companyAdmin, sector); // ¿todo, más parametros? Soy le hombre de plastico, joder.
-        companies[companyAdmin] = company;
-        companiesBySector[sector].push(companyAdmin);
-        company.addEmployee(msg.sender, adminTitle, adminSalary);
-        emit CompanyAdded(address(company), sector);
     }
 
-    function removeCompany(address companyAddress) public {
-        address companyAdmin = msg.sender;
+    function revokeRegistryRight(address companyKey) public onlyOwner {
+        /* allows the owner of the factory to revoke a registry right if not  */
         require(
-            isRegistered[companyAdmin],
-            "No company registered under this address."
+            registryRights[companyKey].granted,
+            "No registry access granted."
+        );
+        require( // todo remove?
+            !registryRights[companyKey].registered,
+            "Company already registered."
+        );
+        registryRights[companyKey].granted = false;
+        emit RegistryRightChanged(
+            companyKey,
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector,
+            registryRights[companyKey].granted,
+            registryRights[companyKey].registered
+        );
+    }
+
+    function registerCompany(address companyKey) public {
+        /* allows an account with registry rights to register a Company */
+        require(
+            registryRights[companyKey].granted && msg.sender == companyKey,
+            "No register access granted."
         );
         require(
-            companyAdmin == companies[companyAddress].employer(),
-            "You are not an admin at this company."
+            !registryRights[msg.sender].registered,
+            "Address already registered."
+        );
+        // register and revoke any rights to register again
+        registryRights[msg.sender].registered = true;
+        registryRights[msg.sender].granted = false;
+
+        // create the Company contract
+        Company company = new Company(
+            msg.sender,
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
         );
 
-        isRegistered[companyAdmin] = false;
-        string memory companySector = companies[companyAdmin].sector();
-        address[] memory companiesInSector = companiesBySector[companySector];
-        // todo, might need to lock while removing.
-        // todo: handle deletion from arrays other way?
-        for (uint i = 0; i < companiesInSector.length; i++) {
-            if (companiesInSector[i] == companyAdmin) {
+        // add to companies mapping and corresponding sector
+        companies[msg.sender] = company;
+        companiesBySector[registryRights[msg.sender].sector].push(msg.sender);
+        emit CompanyRegistered(
+            msg.sender,
+            address(company),
+            registryRights[msg.sender].companyName,
+            registryRights[msg.sender].sector
+        );
+    }
+
+    function removeCompany(address companyKey) public {
+        /* allows the company dmin or owner of factory remove a Company */
+        require(
+            registryRights[companyKey].registered,
+            "No company registered for key."
+        );
+        require(
+            msg.sender == companies[companyKey].companyKey() ||
+                msg.sender == owner,
+            "Not authorized."
+        );
+        registryRights[companyKey].registered = false;
+        address[] storage companiesInSector = companiesBySector[
+            registryRights[companyKey].sector
+        ];
+        for (uint256 i = 0; i < companiesInSector.length; i++) {
+            if (companiesInSector[i] == companyKey) {
                 delete companiesInSector[i];
+                break;
             }
         }
-        companiesBySector[companySector] = companiesInSector;
-        // todo, think about logic for removing a contract, since the other instance still lives
-        delete companies[companyAdmin]; // todo test this implementation
+        emit CompanyRemoved(
+            companyKey,
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector
+        );
+        delete companies[companyKey];
+        delete registryRights[companyKey];
     }
 
-    // query
-
     function getCompanyDetails(
-        address companyAddress
+        address companyKey
     )
         public
         view
         returns (
+            string memory companyName,
             string memory sector,
             uint256 totalEmployees,
             uint256 averageSalary
         )
     {
         require(
-            isRegistered[companyAddress],
-            "No company registered at this address."
+            registryRights[companyKey].registered,
+            "No such company registered."
         );
-        Company company = companies[companyAddress]; // todo: get methods for employees and sector
+        Company company = companies[companyKey];
         totalEmployees = company.totalEmployees();
         averageSalary = company.getAverageSalary();
-        sector = company.sector();
-        return (sector, totalEmployees, averageSalary);
+        return (
+            registryRights[companyKey].companyName,
+            registryRights[companyKey].sector,
+            totalEmployees,
+            averageSalary
+        );
     }
 
-    // function to get the average salary of employees in a sector
-    /*  todo: this processing should perhaps be done in a front end. 
-             and the function just returns _data_ about the sector.
-        todo: what is reasonable to query for a sector? what should be returned. */
+    function getCompanyAddressesInSector(
+        string memory sector
+    ) public view returns (address[] memory) {
+        return companiesBySector[sector];
+    }
+
     function getAverageSalaryInSector(
         string memory sector
     ) public view returns (uint256) {
-        require(isSector[sector], "Not a valid sector.");
         uint256 totalSalaries;
         uint256 totalEmployees;
-
-        for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
-            Company company = Company(companiesBySector[sector][i]);
+        address[] memory c = companiesBySector[sector];
+        for (uint256 i = 0; i < c.length; i++) {
+            Company company = Company(c[i]);
             totalSalaries +=
                 company.getAverageSalary() *
                 company.totalEmployees();
             totalEmployees += company.totalEmployees();
         }
-
         if (totalEmployees > 0) {
-            return totalSalaries / totalEmployees;
+            uint256 average = totalSalaries / totalEmployees;
+            return average;
         } else {
             return 0;
         }
-    }
-
-    // Function to get the addresses of companies in a sector
-    function getCompanyAddressesInSector(
-        string memory sector
-    ) public view returns (address[] memory) {
-        require(isSector[sector], "Not a valid sector.");
-        return companiesBySector[sector];
     }
 }
