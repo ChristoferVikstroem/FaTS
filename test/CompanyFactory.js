@@ -37,7 +37,8 @@ describe('CompanyFactory', function () {
         const [companyAccount, employee1, employee2] = await ethers.getSigners();
         const company = await ethers.deployContract("Company", [companyAccount, companyName, sector]);
         await company.addEmployee(employee1.address, employeeTitle, salary);
-        return { company, companyAccount, employee1, employee2 };}
+        return { company, companyAccount, employee1, employee2 };
+    }
 
     describe('Deployment', function () {
         it('should set deployer as owner,', async function () {
@@ -56,7 +57,7 @@ describe('CompanyFactory', function () {
             await expect(registryRight.registered).to.be.false;
         })
 
-        it('should not allow granting a right without valid parameters', async function () {
+        it('should not allow granting a right without valid parameters.', async function () {
             const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
             await expect(companyFactory.grantRegistryRight(companyAddress, '', sector)).to.be.revertedWith('Provide valid company data.');
             await expect(companyFactory.grantRegistryRight('0x0000000000000000000000000000000000000000', companyName, sector)).to.be.revertedWith('Provide valid company data.');
@@ -66,6 +67,10 @@ describe('CompanyFactory', function () {
         it('should not allow an already granted key another right.', async function () {
             const { companyFactory, companyAccount, companyAddress } = await loadFixture(grantedFixture);
             await expect(companyFactory.grantRegistryRight(companyAddress, "Scooby Doo", "Detectives")).to.be.revertedWith('Access already granted.');
+        });
+        it('should not be possible to be revoked for a company without registry access.', async function () {
+            const { companyFactory, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
+            await expect(companyFactory.connect(factoryOwner).revokeRegistryRight(companyAddress)).to.be.revertedWith('No registry access granted.');
         });
     });
 
@@ -117,7 +122,7 @@ describe('CompanyFactory', function () {
         });
 
         it('should allow owner to remove a company', async function () {
-            const { companyFactory, companyAccount, companyAddress} = await loadFixture(defaultFixture);
+            const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
             await companyFactory.grantRegistryRight(companyAddress, 'Google', 'IT');
             await companyFactory.connect(companyAccount).registerCompany(companyAddress);
             await companyFactory.connect(companyAccount).removeCompany(companyAddress)
@@ -136,9 +141,33 @@ describe('CompanyFactory', function () {
             expect(itCompanies).to.deep.equal([companyAddress]);
             expect(financeCompanies).to.deep.equal([financeCompanyAddress]);
         });
+
+        it('should not allow registering a company without granted registry access', async function () {
+            const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
+            await expect(companyFactory.connect(companyAccount).registerCompany(companyAddress)).to.be.revertedWith('No register access granted.');
+        });
+
+        it('should not allow registering an ungranted company after revoking access', async function () {
+            const { companyFactory, factoryOwner, companyAccount, companyAddress } = await loadFixture(grantedFixture);
+            await companyFactory.connect(factoryOwner).revokeRegistryRight(companyAddress);
+            await expect(companyFactory.connect(companyAccount).registerCompany(companyAddress)).to.be.revertedWith('No register access granted.');
+        });
+
+        it('should handle registering multiple companies in different sectors', async function () {
+            const { companyFactory, companyAccount, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
+            await companyFactory.grantRegistryRight(companyAddress, 'Company1', 'IT');
+            await companyFactory.connect(companyAccount).registerCompany(companyAddress);
+            const financeCompanyAddress = '0x1234567890123456789012345678901234567890';
+            await companyFactory.grantRegistryRight(financeCompanyAddress, 'Company2', 'Finance');
+            await companyFactory.connect(factoryOwner).registerCompany(financeCompanyAddress);
+            const itCompanies = await companyFactory.getCompanyAddressesInSector('IT');
+            const financeCompanies = await companyFactory.getCompanyAddressesInSector('Finance');
+            expect(itCompanies).to.deep.equal([companyAddress]);
+            expect(financeCompanies).to.deep.equal([financeCompanyAddress]);
+        });
     });
 
-    describe('Company Query', function () {
+    describe('Querying', function () {
         it('should return correct details for a registered company', async function () {
             const { companyFactory, companyAddress, companyName, sector } = await loadFixture(registeredFixture);
             var details = await companyFactory.getCompanyDetails(companyAddress);
@@ -164,113 +193,75 @@ describe('CompanyFactory', function () {
             const averageSalary = await companyFactory.getAverageSalaryInSector('fakeTestSector');
             expect(averageSalary).to.equal(0);
         });
-    });
-
-    describe('Additional Tests', function () {
-        describe('Access rights', function () {
-            it('should not allow revoking registry right for an unregistered company', async function () {
-                const { companyFactory, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
-                await expect(companyFactory.connect(factoryOwner).revokeRegistryRight(companyAddress)).to.be.revertedWith('No registry access granted.');
-            });
+        it('should return 0 average salary for a sector with no employees', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
+            expect(averageSalary).to.equal(0);
         });
 
-        describe('Registering a company.', function () {
-            it('should not allow registering a company without granted registry access', async function () {
-                const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
-                await expect(companyFactory.connect(companyAccount).registerCompany(companyAddress)).to.be.revertedWith('No register access granted.');
-            });
-
-            it('should not allow registering an ungranted company after revoking access', async function () {
-                const { companyFactory, factoryOwner, companyAccount, companyAddress } = await loadFixture(grantedFixture);
-                await companyFactory.connect(factoryOwner).revokeRegistryRight(companyAddress);
-                await expect(companyFactory.connect(companyAccount).registerCompany(companyAddress)).to.be.revertedWith('No register access granted.');
-            });
-
-            it('should handle registering multiple companies in different sectors', async function () {
-                const { companyFactory, companyAccount, factoryOwner, companyAddress } = await loadFixture(defaultFixture);
-                await companyFactory.grantRegistryRight(companyAddress, 'Company1', 'IT');
-                await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-                const financeCompanyAddress = '0x1234567890123456789012345678901234567890';
-                await companyFactory.grantRegistryRight(financeCompanyAddress, 'Company2', 'Finance');
-                await companyFactory.connect(factoryOwner).registerCompany(financeCompanyAddress);
-                const itCompanies = await companyFactory.getCompanyAddressesInSector('IT');
-                const financeCompanies = await companyFactory.getCompanyAddressesInSector('Finance');
-                expect(itCompanies).to.deep.equal([companyAddress]);
-                expect(financeCompanies).to.deep.equal([financeCompanyAddress]);
-            });
+        it('should return correct total employees and average salary for a registered company', async function () {
+            const { companyFactory, companyAddress } = await loadFixture(registeredFixture);
+            const details = await companyFactory.getCompanyDetails(companyAddress);
+            expect(details[2]).to.equal(0);
+            expect(details[3]).to.equal(0);
         });
 
-        describe('Company Query', function () {
-            it('should return 0 average salary for a sector with no employees', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
-                expect(averageSalary).to.equal(0);
-            });
+        it('should handle getCompanyAddressesInSector with no companies', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const companies = await companyFactory.getCompanyAddressesInSector('NonexistentSector');
+            expect(companies).to.deep.equal([]);
+        });
 
-            it('should return correct total employees and average salary for a registered company', async function () {
-                const { companyFactory, companyAddress } = await loadFixture(registeredFixture);
-                const details = await companyFactory.getCompanyDetails(companyAddress);
-                expect(details[2]).to.equal(0);
-                expect(details[3]).to.equal(0);
-            });
+        it('should return correct details for a registered company', async function () {
+            const { companyFactory, companyAddress, companyName, sector } = await loadFixture(registeredFixture);
+            const details = await companyFactory.getCompanyDetails(companyAddress);
+            expect([details[0], details[1], Number(details[2]), Number(details[3])]).to.deep.equal(["Google", "IT", 0, 0]);
+        });
 
-            it('should handle getCompanyAddressesInSector with no companies', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const companies = await companyFactory.getCompanyAddressesInSector('NonexistentSector');
-                expect(companies).to.deep.equal([]);
-            });
+        it('should return 0 average salary for a sector with no employees', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
+            expect(averageSalary).to.equal(0);
+        });
 
-            it('should return correct details for a registered company', async function () {
-                const { companyFactory, companyAddress, companyName, sector } = await loadFixture(registeredFixture);
-                const details = await companyFactory.getCompanyDetails(companyAddress);
-                expect([details[0], details[1], Number(details[2]), Number(details[3])]).to.deep.equal(["Google", "IT", 0, 0]);
-            });
+        it('should handle getCompanyAddressesInSector with no companies', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const companies = await companyFactory.getCompanyAddressesInSector('NonexistentSector');
+            expect(companies).to.deep.equal([]);
+        });
 
-            it('should return 0 average salary for a sector with no employees', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
-                expect(averageSalary).to.equal(0);
-            });
+        it('should handle getAverageSalaryInSector with no companies', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
+            expect(averageSalary).to.equal(0);
+        });
 
-            it('should handle getCompanyAddressesInSector with no companies', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const companies = await companyFactory.getCompanyAddressesInSector('NonexistentSector');
-                expect(companies).to.deep.equal([]);
-            });
-
-            it('should handle getAverageSalaryInSector with no companies', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const averageSalary = await companyFactory.getAverageSalaryInSector('NonexistentSector');
-                expect(averageSalary).to.equal(0);
-            });
-
-            it('should handle getAverageSalaryInSector with no employees', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                const fakeTestSector = 'does-not-exist-Sector';
-                const averageSalary = await companyFactory.getAverageSalaryInSector(fakeTestSector);
-                expect(averageSalary).to.equal(0);
-            });
-            it('should revert for a sector with no companies', async function () {
-                const { companyFactory } = await loadFixture(defaultFixture);
-                expect(await companyFactory.getAverageSalaryInSector('fakeTestSector')).to.be.revertedWith('The sector has no registered companies.');
-            });
-            it('should handle getAverageSalaryInSector with no employees in the sector but with companies', async function () {
-                const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
-                await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
-                await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-                expect(await companyFactory.connect(companyAccount).getAverageSalaryInSector("IT")).to.equal(0);
-            });
-            it('should handle getAverageSalaryInSector with multiple companies', async function () {
-                const { companyFactory, companyAccount, companyAddress, employee1, employee2 } = await loadFixture(registeredFixture);
-                await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
-                await companyFactory.connect(companyAccount).registerCompany(companyAddress);
-                const company = await ethers.getContractAt("Company", companyAddress);
-                await company.connect(companyAccount).addEmployee(employee1.address, "CEO", 10000);
-                await company.connect(companyAccount).addEmployee(employee2.address, "CTO", 10000);
-                const averageSalary = await expect(companyFactory.getAverageSalaryInSector(sector)).to.be.fulfilled;
-                const expectedSalary = 10000;
-                expect(Number(averageSalary)).to.equal(expectedSalary);
-            });
+        it('should handle getAverageSalaryInSector with no employees', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            const fakeTestSector = 'does-not-exist-Sector';
+            const averageSalary = await companyFactory.getAverageSalaryInSector(fakeTestSector);
+            expect(averageSalary).to.equal(0);
+        });
+        it('should revert for a sector with no companies', async function () {
+            const { companyFactory } = await loadFixture(defaultFixture);
+            expect(await companyFactory.getAverageSalaryInSector('fakeTestSector')).to.be.revertedWith('The sector has no registered companies.');
+        });
+        it('should handle getAverageSalaryInSector with no employees in the sector but with companies', async function () {
+            const { companyFactory, companyAccount, companyAddress } = await loadFixture(defaultFixture);
+            await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
+            await companyFactory.connect(companyAccount).registerCompany(companyAddress);
+            expect(await companyFactory.connect(companyAccount).getAverageSalaryInSector("IT")).to.equal(0);
+        });
+        it('should handle getAverageSalaryInSector with multiple companies', async function () {
+            const { companyFactory, companyAccount, companyAddress, employee1, employee2 } = await loadFixture(registeredFixture);
+            await companyFactory.grantRegistryRight(companyAddress, "Google", "IT");
+            await companyFactory.connect(companyAccount).registerCompany(companyAddress);
+            const company = await ethers.getContractAt("Company", companyAddress);
+            await company.connect(companyAccount).addEmployee(employee1.address, "CEO", 10000);
+            await company.connect(companyAccount).addEmployee(employee2.address, "CTO", 10000);
+            const averageSalary = await expect(companyFactory.getAverageSalaryInSector(sector)).to.be.fulfilled;
+            const expectedSalary = 10000;
+            expect(Number(averageSalary)).to.equal(expectedSalary);
         });
     });
 })
