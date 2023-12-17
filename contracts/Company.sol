@@ -93,7 +93,6 @@ contract Company {
         delete employees[employeeAddress];
     }
 
-    // todo, update years experience?
     function updateEmployee(
         address employeeAddress,
         string memory newTitle,
@@ -121,8 +120,6 @@ contract Company {
         );
     }
 
-    // get the average salary of employees in the company
-    // todo: functionality that should be moved off-chain?
     function getAverageSalary() external view returns (uint256) {
         if (totalEmployees > 0) {
             return totalSalaries / totalEmployees;
