@@ -11,6 +11,7 @@ contract Company {
     uint256 public totalEmployees;
     uint256 private totalSalaries;
     mapping(address => Employee) public employees;
+    address[] public employeeAddresses;
 
     struct Employee {
         string title;
@@ -73,6 +74,7 @@ contract Company {
             salaryVerified: false,
             isEmployee: true
         });
+        employeeAddresses.push(employeeAddress);
         totalSalaries = totalSalaries + _salary;
         totalEmployees = totalEmployees + 1;
         emit EmployeeAdded(employeeAddress, _title, _salary);
