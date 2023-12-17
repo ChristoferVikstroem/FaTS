@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
+// FaTS!
+
 contract Company {
     // company details
     address public immutable companyKey;
@@ -10,55 +12,29 @@ contract Company {
     uint256 private totalSalaries;
     mapping(address => Employee) public employees;
 
-    // gender, yrs experience, update or calculate.
-    enum Gender {
-        Female,
-        Male,
-        Other
-    }
-
     struct Employee {
         string title;
-        Gender gender;
         uint256 salary;
-        uint32 yearsPriorExperience;
-        uint256 dateEmployed;
         bool isEmployee;
         bool salaryVerified;
     }
 
-    event EmployeeAdded(
-        address employeeAddress,
-        string title,
-        Gender gender,
-        uint256 salary,
-        uint32 yearsOfExperience
-    );
+    event EmployeeAdded(address employeeAddress, string title, uint256 salary);
 
     event EmployeeRemoved(
         address employeeAddress,
         string title,
-        Gender gender,
-        uint256 salary,
-        uint32 yearsPriorExperience,
-        uint256 dateEmployed
+        uint256 salary
     );
     event EmployeeUpdated(
         address employeeAddress,
         string oldTitle,
         string newTitle,
         uint256 oldSalary,
-        uint256 newSalary,
-        Gender oldGender,
-        Gender newGender
+        uint256 newSalary
     );
 
-    event SalaryVerified(
-        address employeeAddress,
-        string title,
-        Gender gender,
-        uint256 salary
-    );
+    event SalaryVerified(address employeeAddress, string title, uint256 salary);
 
     modifier onlyEmployer() {
         // todo: add access control library?
@@ -81,8 +57,6 @@ contract Company {
     function addEmployee(
         address employeeAddress,
         string memory _title,
-        Gender _gender,
-        uint32 _yearsPriorExperience,
         uint256 _salary
     ) external onlyEmployer {
         require(
@@ -96,21 +70,12 @@ contract Company {
         employees[employeeAddress] = Employee({
             title: _title,
             salary: _salary,
-            gender: _gender,
-            yearsPriorExperience: _yearsPriorExperience,
-            dateEmployed: block.timestamp,
             salaryVerified: false,
             isEmployee: true
         });
         totalSalaries = totalSalaries + _salary;
         totalEmployees = totalEmployees + 1;
-        emit EmployeeAdded(
-            employeeAddress,
-            _title,
-            _gender,
-            _salary,
-            _yearsPriorExperience
-        );
+        emit EmployeeAdded(employeeAddress, _title, _salary);
     }
 
     function removeEmployee(address employeeAddress) external onlyEmployer {
@@ -125,19 +90,14 @@ contract Company {
         emit EmployeeRemoved(
             employeeAddress,
             removedEmployee.title,
-            removedEmployee.gender,
-            removedEmployee.salary,
-            removedEmployee.yearsPriorExperience,
-            removedEmployee.dateEmployed
+            removedEmployee.salary
         );
         delete employees[employeeAddress];
     }
 
-    // todo, update years experience?
     function updateEmployee(
         address employeeAddress,
         string memory newTitle,
-        Gender newGender,
         uint256 newSalary
     ) external onlyEmployer {
         require(
@@ -158,14 +118,10 @@ contract Company {
             oldEmployee.title,
             newTitle,
             oldEmployee.salary,
-            newSalary,
-            oldEmployee.gender,
-            newGender
+            newSalary
         );
     }
 
-    // get the average salary of employees in the company
-    // todo: functionality that should be moved off-chain?
     function getAverageSalary() external view returns (uint256) {
         if (totalEmployees > 0) {
             return totalSalaries / totalEmployees;
@@ -199,7 +155,6 @@ contract Company {
         emit SalaryVerified(
             msg.sender,
             employees[msg.sender].title,
-            employees[msg.sender].gender,
             employees[msg.sender].salary
         );
     }
