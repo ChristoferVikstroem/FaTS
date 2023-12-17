@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
+// FaTS!
+
 contract Company {
     // company details
     address public immutable companyKey;

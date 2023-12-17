@@ -50,7 +50,14 @@ contract CompanyFactory {
                 bytes(_sector).length > 0,
             "Provide valid company data."
         );
-        require(!registryRights[companyKey].granted, "Access already granted.");
+        require(
+            !registryRights[companyKey].granted,
+            "Registry right already granted."
+        );
+        require(
+            !registryRights[companyKey].registered,
+            "Company already registered."
+        ); // test!
         registryRights[companyKey] = RegistryRight({
             companyName: _companyName,
             sector: _sector,
@@ -72,10 +79,6 @@ contract CompanyFactory {
             registryRights[companyKey].granted,
             "No registry access granted."
         );
-        require( // todo remove?
-            !registryRights[companyKey].registered,
-            "Company already registered."
-        );
         registryRights[companyKey].granted = false;
         emit RegistryRightChanged(
             companyKey,
@@ -89,12 +92,12 @@ contract CompanyFactory {
     function registerCompany(address companyKey) public {
         /* allows an account with registry rights to register a Company */
         require(
-            registryRights[companyKey].granted && msg.sender == companyKey,
-            "No register access granted."
+            !registryRights[msg.sender].registered,
+            "Company already registered."
         );
         require(
-            !registryRights[msg.sender].registered,
-            "Address already registered."
+            registryRights[companyKey].granted && msg.sender == companyKey,
+            "No register access granted."
         );
         // register and revoke any rights to register again
         registryRights[msg.sender].registered = true;
@@ -181,26 +184,29 @@ contract CompanyFactory {
         return companiesBySector[sector];
     }
 
-    function getAverageSalaryInSector(string memory sector) public view returns (uint256) {
-    uint256 totalSalaries;
-    uint256 totalEmployees;
-    uint256 result = 0;
-    for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
-        Company company = companies[companiesBySector[sector][i]];
+    function getAverageSalaryInSector(
+        string memory sector
+    ) public view returns (uint256) {
+        uint256 totalSalaries;
+        uint256 totalEmployees;
+        uint256 result = 0;
+        for (uint256 i = 0; i < companiesBySector[sector].length; i++) {
+            Company company = companies[companiesBySector[sector][i]];
 
-        // Check if company has employees before adding to totalSalaries
-        if (company.totalEmployees() > 0) {
-            totalSalaries += company.getAverageSalary() * company.totalEmployees();
-            totalEmployees += company.totalEmployees();
+            // Check if company has employees before adding to totalSalaries
+            if (company.totalEmployees() > 0) {
+                totalSalaries +=
+                    company.getAverageSalary() *
+                    company.totalEmployees();
+                totalEmployees += company.totalEmployees();
+            }
+        }
+        // Avoid division by zero
+        if (totalEmployees > 0) {
+            result = totalSalaries / totalEmployees;
+            return result;
+        } else {
+            return result;
         }
     }
-    // Avoid division by zero
-    if (totalEmployees > 0) {
-        result = totalSalaries / totalEmployees;
-        return result;
-    } else {
-        return result;
-    }
-}
-
 }

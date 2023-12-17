@@ -12,7 +12,7 @@ describe('Company', function () {
   const employeeTitle = 'Software Engineer';
   const salary = 60000;
 
-  // fixture for set up only once
+  // fixtures for set up only once
   async function defaultFixture() {
     const [companyAccount, employee1, employee2] = await ethers.getSigners();
     const company = await ethers.deployContract("Company", [companyAccount, companyName, sector]);
@@ -175,13 +175,13 @@ describe('Company', function () {
 
   describe('Average salary in Company', function () {
     it('should return correct average for one employee', async function () {
-      const { company, employee1, employee2 } = await loadFixture(defaultFixture);
+      const { company, employee2 } = await loadFixture(defaultFixture);
       await company.addEmployee(employee2.address, employeeTitle, 42);
       await expect(await company.getAverageSalary()).to.equal(42);
     });
 
     it('should return correct average for multiple employees', async function () {
-      const { company, employee1, employee2 } = await loadFixture(employeeAddedFixture);
+      const { company, employee2 } = await loadFixture(employeeAddedFixture);
       await company.addEmployee(employee2.address, "CTO", 40000);
       await expect(await company.getAverageSalary()).to.equal(50000);
     });
